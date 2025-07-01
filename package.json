@@ -7,6 +7,8 @@
     "type-check": "tsc"
   },
   "dependencies": {
+    "@rive-app/react-canvas": "^4.21.4",
+    "d3": "^7.9.0",
     "next": "latest",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

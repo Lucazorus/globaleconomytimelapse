@@ -1,0 +1,290 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === BASE === */
+html, body {
+  height: 100%;
+  background: #1A2327 !important;
+  font-family: 'Inter', Arial, sans-serif;
+  color: #e9eef4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* === TITRES ET LABELS === */
+.title-glow {
+  font-size: 2.4rem;
+  font-weight: 300;
+  color: #e9eef4;
+  letter-spacing: -1px;
+  text-shadow: 0 3px 24px #1118, 0 0 1px #719CAF;
+}
+.year-big {
+  font-size: 5rem;
+  font-weight: 300;
+  color: #fff;
+  opacity: 0.92;
+  text-shadow: 0 8px 48px #719CAF99, 0 2px 8px #000b;
+  letter-spacing: -2px;
+  line-height: 1;
+}
+
+/* === REGION BUTTONS TEXT UNDERLINE MODERN === */
+.region-btn {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0.35rem 0.8rem;
+  margin: 0.1rem 0.12rem;
+  font-family: inherit;
+  font-size: 1.01rem;
+  font-weight: 300;
+  color: #e9eef4;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.18s;
+  opacity: 0.84;
+  border-radius: 0;
+  font-stretch: condensed;
+  user-select: none;
+}
+
+.region-btn::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0.13em;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #6FAF96 0%, #719CAF 100%);
+  transition: width 0.32s cubic-bezier(.4,1.1,.23,1), left 0.24s;
+  border-radius: 2px;
+}
+
+.region-btn:hover::after,
+.region-btn--active::after {
+  width: 100%;
+  left: 0;
+}
+
+.region-btn.unselecting::after {
+  width: 0;
+  left: 100%;
+  transition: width 0.24s cubic-bezier(.55,.13,.82,1), left 0.24s;
+}
+
+.region-btn:hover,
+.region-btn--active {
+  color: #fff;
+  opacity: 1;
+}
+
+.region-btn:focus-visible {
+  outline: 2px solid #719CAF;
+  outline-offset: 2px;
+}
+
+/* === GRAPH-SELECTOR BUTTONS (SOULIGNEMENT BLANC, POLICE +GRANDE) === */
+.graph-btn {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0.47rem 1.19rem;           /* légèrement plus grand que region-btn */
+  margin: 0.14rem 0.26rem;
+  font-family: inherit;
+  font-size: 1.21rem;                 /* légèrement plus grand */
+  font-weight: 400;
+  color: #e9eef4;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.18s, opacity 0.2s;
+  opacity: 0.92;
+  border-radius: 0;
+  font-stretch: condensed;
+  user-select: none;
+  align-items: center;
+  gap: 0.45em;
+}
+.graph-btn::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0.11em;
+  width: 0;
+  height: 3px;
+  background: #fff;                       /* SOULIGNÉ BLANC PUR */
+  transition: width 0.34s cubic-bezier(.4,1.1,.23,1), left 0.24s;
+  border-radius: 2px;
+}
+.graph-btn:hover::after,
+.graph-btn--active::after {
+  width: 100%;
+  left: 0;
+}
+.graph-btn.unselecting::after {
+  width: 0;
+  left: 100%;
+  transition: width 0.24s cubic-bezier(.55,.13,.82,1), left 0.24s;
+}
+.graph-btn:hover,
+.graph-btn--active {
+  color: #fff;
+  opacity: 1;
+}
+.graph-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* === SLIDER MODERNE GLASS === */
+input[type="range"] {
+  accent-color: #719CAF;
+  /* width: 100%;  ENLEVER cette ligne dans le css si tu utilises flex-1 dans le JSX !! */
+  height: 4px;
+  background: linear-gradient(90deg, #719CAF99 0%, #6FAF96cc 100%);
+  border-radius: 8px;
+  outline: none;
+  transition: box-shadow 0.2s;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #719CAF;
+  box-shadow: 0 0 10px #719CAF55;
+  transition: box-shadow 0.2s;
+}
+input[type="range"]:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 5px #6FAF9622;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #719CAF;
+  box-shadow: 0 0 10px #719CAF55;
+}
+input[type="range"]:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 5px #6FAF9622;
+}
+input[type="range"]::-ms-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #719CAF;
+  box-shadow: 0 0 10px #719CAF55;
+}
+input[type="range"]:focus::-ms-thumb {
+  box-shadow: 0 0 0 5px #6FAF9622;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 8px;
+}
+input[type="range"]:focus {
+  outline: none;
+}
+
+/* === GLASSMORPHISM POUR LES CARTES/BARRES/CONTAINERS === */
+.glass {
+  background: rgba(255,255,255,0.08);
+  border-radius: 1rem;
+  backdrop-filter: blur(8px) saturate(1.12);
+  box-shadow: 0 4px 32px #0002;
+  border: 1px solid rgba(255,255,255,0.09);
+}
+.bar-glass {
+  background: rgba(255, 255, 255, 0.13);
+  border-radius: 12px;
+  backdrop-filter: blur(3px);
+  box-shadow: 0 2px 10px #0003;
+}
+
+/* === SELECT GLASSMORPHIC === */
+.select-glass {
+  background: rgba(255,255,255,0.10);
+  color: #fff;
+  border: none;
+  outline: none;
+  border-radius: 0.9rem;
+  padding: 0.38rem 1.3rem 0.38rem 1.2rem;
+  font-size: 1.22rem;
+  font-family: 'Inter', monospace, Arial, sans-serif;
+  font-weight: 400;
+  box-shadow: 0 3px 18px #1116, 0 0 0 2px #719CAF66;
+  backdrop-filter: blur(6px) saturate(1.06);
+  transition: box-shadow 0.18s, background 0.23s;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  min-width: 94px;
+}
+.select-glass:focus {
+  box-shadow: 0 2px 16px #719CAFcc, 0 0 0 2.5px #719CAFbb;
+  background: rgba(255,255,255,0.17);
+  outline: none;
+}
+.select-glass option {
+  background: #232a38 !important;
+  color: #fff;
+  font-weight: 500;
+  border-radius: 0.9rem;
+  padding: 0.38rem 1.3rem;
+}
+.select-glass::-ms-expand { display: none; }
+.select-glass::-webkit-select-placeholder { color: #fff; opacity: 0.7; }
+.select-glass:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* === RESPONSIVE TITRES/BOUTONS === */
+@media (max-width: 900px) {
+  .year-big { font-size: 2.7rem; }
+  .title-glow { font-size: 1.25rem; }
+  .region-btn { font-size: 0.86rem; padding: 0.22rem 0.6rem; }
+  .graph-btn { font-size: 1.05rem; padding: 0.30rem 0.75rem; }
+  .select-glass { font-size: 1.03rem; min-width: 76px; }
+}
+
+/* === ANIMATIONS FADE === */
+.fade-in {
+  animation: fadein .7s cubic-bezier(.23,1.1,.32,1) both;
+}
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(12px);}
+  to { opacity: 1; transform: none;}
+}
+
+/* === CORRECTION DU RING GRIS NATIF SUR TOUS LES BOUTONS === */
+button:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* === CONTENEUR CENTRAGE CONTROLES D'ANIMATION === */
+.center-controls-wrapper {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  max-width: 36rem; /* correspond à max-w-xl */
+  margin-left: auto !important;
+  margin-right: auto !important;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border-radius: 1rem;
+  /* backdrop-filter: blur(8px);   <<< SUPPRIMÉ */
+  box-shadow: 0 4px 32px #0002;
+}

@@ -1,0 +1,658 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import * as d3 from "d3";
+import { REGION_LIST, regionColors } from "./Colors";
+import PlayPauseButton from "./PlayPauseButton";
+
+// ---- TOOLTIP ----
+function useTooltip() {
+  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
+  function showTooltip(x, y, content) {
+    setTooltip({ show: true, x, y, content });
+  }
+  function hideTooltip() {
+    setTooltip((tt) => ({ ...tt, show: false }));
+  }
+  return { tooltip, showTooltip, hideTooltip };
+}
+
+// ---- FORMATAGE ----
+function formatNumberSpace(n) {
+  if (typeof n !== "number" || isNaN(n)) return "";
+  return n.toLocaleString("fr-FR").replace(/\u202f/g, " ");
+}
+
+export default function AnimatedTreemapGDP({
+  data,
+  years,
+  animValue,
+  playing,
+  setPlaying,
+  onYearChange,
+  countryFocus,
+  setCountryFocus,
+  selectedRegions,
+  setSelectedRegions,
+  freeForAll,
+  setFreeForAll,
+  proportional,
+  setProportional,
+  mode,
+}) {
+  const containerRef = useRef(null);
+  const svgRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
+
+  // Responsive: taille basée sur le parent, pas le viewport !
+  useEffect(() => {
+    function handleResize() {
+      if (!containerRef.current) return;
+      const width = containerRef.current.offsetWidth || 1200;
+      const height = containerRef.current.clientHeight || 400;
+      setContainerSize({
+        width: Math.max(0, width),
+        height: Math.max(0, height),
+      });
+    }
+    handleResize();
+    const observer = new window.ResizeObserver(handleResize);
+    if (containerRef.current) observer.observe(containerRef.current);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  const { width, height } = containerSize;
+  const { tooltip, showTooltip, hideTooltip } = useTooltip();
+  const [countryList, setCountryList] = useState([]);
+  const [focusData, setFocusData] = useState(null);
+
+  const isPerCapita = data && data.length && d3.max(data, d => d.gdp) < 5_000_000;
+
+  function formatValue(val) {
+    if (isPerCapita) {
+      return "$" + formatNumberSpace(Math.round(val));
+    } else {
+      return "$" + formatNumberSpace(Math.round(val / 1e9)) + "B";
+    }
+  }
+
+  function getHierarchy(data, year, selectedRegions, freeForAll = false) {
+    const regionsToShow = selectedRegions;
+    const currentYearData = data.filter(
+      (d) =>
+        d.year === year &&
+        d.gdp &&
+        d.gdp > 0 &&
+        d.region &&
+        d.region !== "Other" &&
+        regionsToShow.includes(d.region)
+    );
+    if (freeForAll) {
+      return {
+        name: "World",
+        children: currentYearData.map((d) => ({
+          name: d.country,
+          value: d.gdp,
+          region: d.region,
+        })),
+      };
+    }
+    const regions = d3.group(currentYearData, (d) => d.region);
+    const regionsArr = Array.from(regions, ([region, countries]) => ({
+      name: region,
+      children: countries.map((d) => ({
+        name: d.country,
+        value: d.gdp,
+        region: d.region,
+      })),
+    }));
+    return { name: "World", children: regionsArr };
+  }
+
+  function mapTreemapNodes(root) {
+    const map = new Map();
+    root.leaves().forEach((d) => {
+      map.set((d.parent?.data.name ?? "") + "|" + d.data.name, {
+        x0: d.x0,
+        x1: d.x1,
+        y0: d.y0,
+        y1: d.y1,
+        value: d.value ?? 0,
+        region: d.data.region,
+      });
+    });
+    return map;
+  }
+
+  function getFontSize(area, maxFont = 24, minFont = 5) {
+    return Math.max(minFont, Math.min(maxFont, Math.sqrt(area) / 5));
+  }
+
+  const safeSelectedRegions =
+    !selectedRegions || selectedRegions === "ALL"
+      ? REGION_LIST.filter((r) => r !== "Other")
+      : selectedRegions.filter((r) => r !== "Other");
+
+  // Animation
+  const playingRef = useRef(playing);
+  useEffect(() => { playingRef.current = playing; }, [playing]);
+  useEffect(() => {
+    if (!playing || years.length === 0) return;
+    let animating = true;
+    const tick = () => {
+      onYearChange((prev) => {
+        if (!playingRef.current || !animating) return prev;
+        const idx = years.findIndex((y) => y >= Math.floor(prev));
+        if (idx < years.length - 1) {
+          const target = years[idx + 1];
+          if (prev < target) {
+            const next = Math.min(prev + 0.02, target);
+            return next;
+          } else {
+            return target;
+          }
+        } else {
+          setPlaying(false);
+          return prev;
+        }
+      });
+      if (playingRef.current && animating) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return () => { animating = false; };
+  }, [playing, years, onYearChange, setPlaying]);
+
+  function handleFreeForAllClick() {
+    if (freeForAll) {
+      setSelectedRegions(null);
+    }
+    setFreeForAll(true);
+  }
+  function handleWorldClick() {
+    if (!freeForAll) {
+      setSelectedRegions(null);
+    }
+    setFreeForAll(false);
+  }
+  function handleRegionClick(region) {
+    if (region === "Other") return;
+    const wasPlaying = playing;
+    setSelectedRegions((current) => {
+      if (!current || current === null) return [region];
+      if (current.includes(region)) return current;
+      return [...current, region];
+    });
+    if (wasPlaying) setTimeout(() => setPlaying(true), 0);
+  }
+  function handleRegionToggle(region) {
+    if (region === "Other") return;
+    const wasPlaying = playing;
+    setSelectedRegions((current) => {
+      if (!current || current === null) return [region];
+      if (current.includes(region)) {
+        const next = current.filter((r) => r !== region);
+        return next.length === 0 ? null : next;
+      } else {
+        return [...current, region];
+      }
+    });
+    if (wasPlaying) setTimeout(() => setPlaying(true), 0);
+  }
+
+  useEffect(() => {
+    if (!svgRef.current || data.length === 0 || years.length === 0) return;
+    const y1 = Math.floor(animValue);
+    const y2 = Math.ceil(animValue);
+    const t = animValue - y1;
+    const regionsArray = safeSelectedRegions;
+
+    const y1Clamped = Math.max(years[0], Math.min(years[years.length - 1], y1));
+    const y2Clamped = Math.max(years[0], Math.min(years[years.length - 1], y2));
+    const PADDING_TOP = freeForAll ? 0 : 0;
+    const PADDING_INNER = 2;
+    const PADDING_OUTER = 2;
+
+    let k1 = 1, k2 = 1;
+    if (proportional) {
+      const maxTotal =
+        d3.max(years, (y) => {
+          const arr = data.filter(
+            (d) =>
+              d.year === y &&
+              d.gdp &&
+              d.gdp > 0 &&
+              d.region && d.region !== "Other" &&
+              regionsArray.includes(d.region)
+          );
+          return d3.sum(arr, (d) => d.gdp);
+        }) || 1;
+      const total1 = d3.sum(
+        data.filter(
+          (d) =>
+            d.year === y1Clamped &&
+            d.gdp &&
+            d.gdp > 0 &&
+            d.region && d.region !== "Other" &&
+            regionsArray.includes(d.region)
+        ),
+        (d) => d.gdp
+      );
+      const total2 = d3.sum(
+        data.filter(
+          (d) =>
+            d.year === y2Clamped &&
+            d.gdp &&
+            d.gdp > 0 &&
+            d.region && d.region !== "Other" &&
+            regionsArray.includes(d.region)
+        ),
+        (d) => d.gdp
+      );
+      k1 = Math.sqrt(total1 / maxTotal);
+      k2 = Math.sqrt(total2 / maxTotal);
+    }
+
+    const h1 = d3
+      .hierarchy(getHierarchy(data, y1Clamped, regionsArray, freeForAll))
+      .sum((d) => d.value || 0)
+      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    const h2 = d3
+      .hierarchy(getHierarchy(data, y2Clamped, regionsArray, freeForAll))
+      .sum((d) => d.value || 0)
+      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+
+    d3
+      .treemap()
+      .size([width * k1, height * k1])
+      .paddingInner(PADDING_INNER)
+      .paddingOuter(PADDING_OUTER)
+      .paddingTop((d) => (!freeForAll && d.height === 1 ? PADDING_TOP : 0))(h1);
+    d3
+      .treemap()
+      .size([width * k2, height * k2])
+      .paddingInner(PADDING_INNER)
+      .paddingOuter(PADDING_OUTER)
+      .paddingTop((d) => (!freeForAll && d.height === 1 ? PADDING_TOP : 0))(h2);
+
+    h1.each((d) => {
+      d.x0 += ((1 - k1) / 2) * width;
+      d.x1 += ((1 - k1) / 2) * width;
+      d.y0 += ((1 - k1) / 2) * height;
+      d.y1 += ((1 - k1) / 2) * height;
+    });
+    h2.each((d) => {
+      d.x0 += ((1 - k2) / 2) * width;
+      d.x1 += ((1 - k2) / 2) * width;
+      d.y0 += ((1 - k2) / 2) * height;
+      d.y1 += ((1 - k2) / 2) * height;
+    });
+
+    const m1 = mapTreemapNodes(h1), m2 = mapTreemapNodes(h2);
+
+    const svg = d3
+      .select(svgRef.current)
+      .attr("viewBox", `0 -30 ${width} ${height + 50}`)
+      .attr("width", width)
+      .attr("height", height + 50);
+    svg.selectAll("*").remove();
+
+    svg
+      .append("rect")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", width)
+      .attr("height", height)
+      .attr("fill", "transparent")
+      .lower();
+
+    const regionNodes = h1.children || [];
+    const regionLabelData = regionNodes.map((regionNode) => {
+      const regionWidth = regionNode.x1 - regionNode.x0;
+      const regionHeight = regionNode.y1 - regionNode.y0;
+      const regionArea = regionWidth * regionHeight;
+      return {
+        name: regionNode.data.name,
+        x0: regionNode.x0,
+        y0: regionNode.y0,
+        x1: regionNode.x1,
+        y1: regionNode.y1,
+        width: regionWidth,
+        area: regionArea,
+        subtotal: regionNode.value
+          ? formatValue(regionNode.value)
+          : "",
+        fontSize: getFontSize(regionArea),
+      };
+    });
+    const regionFontSizeMap = {};
+    for (const r of regionLabelData) {
+      regionFontSizeMap[r.name] = r.fontSize;
+    }
+
+    const leaves = Array.from(new Set([...m1.keys(), ...m2.keys()]));
+    const nodes = leaves
+      .map((key) => {
+        const a = m1.get(key);
+        const b = m2.get(key);
+        if (!a && !b) return null;
+        const x0 = a && b ? (1 - t) * a.x0 + t * b.x0 : a ? a.x0 : b.x0;
+        const x1 = a && b ? (1 - t) * a.x1 + t * b.x1 : a ? a.x1 : b.x1;
+        const y0 = a && b ? (1 - t) * a.y0 + t * b.y0 : a ? a.y0 : b.y0;
+        const y1 = a && b ? (1 - t) * a.y1 + t * b.y1 : a ? a.y1 : b.y1;
+        const value =
+          a && b ? (1 - t) * a.value + t * b.value : a ? a.value : b.value;
+        const region = (a && a.region) || (b && b.region);
+        const [_, country] = key.split("|");
+        return { x0, x1, y0, y1, value, region, country };
+      })
+      .filter(Boolean);
+
+    setCountryList(
+      nodes
+        .map((n) => n.country)
+        .filter((v, i, arr) => arr.indexOf(v) === i)
+        .sort()
+    );
+
+    if (countryFocus) {
+      const f = nodes.find((n) => n.country === countryFocus);
+      setFocusData(f);
+    } else {
+      setFocusData(null);
+    }
+
+    const group = svg.append("g").attr("class", "treemap");
+    group
+      .selectAll("g")
+      .data(nodes, (d) => d.region + "|" + d.country)
+      .join("g")
+      .attr("transform", (d) => `translate(${d.x0},${d.y0})`)
+      .each(function (d) {
+        const g = d3.select(this);
+        const isFocused = countryFocus && d.country === countryFocus;
+        g.append("rect")
+          .attr("width", d.x1 - d.x0)
+          .attr("height", d.y1 - d.y0)
+          .attr("fill", isFocused ? "#FA003F" : regionColors(d.region))
+          .attr("cursor", "pointer")
+          .on("click", function(event, d) {
+            event.stopPropagation();
+            setPlaying(false);
+            setCountryFocus(d.country);
+          })
+          .on("mousemove", function(event) {
+            showTooltip(
+              event.clientX,
+              event.clientY,
+              `<b>${d.country}</b><br>${formatValue(d.value)}`
+            );
+          })
+          .on("mouseleave", hideTooltip);
+
+        const area = (d.x1 - d.x0) * (d.y1 - d.y0);
+        const maxFont = regionFontSizeMap[d.region] || 22;
+        const fontSize = getFontSize(area, maxFont);
+
+        if (d.x1 - d.x0 > 55 && d.y1 - d.y0 > 34) {
+          g.append("text")
+            .attr("x", 4)
+            .attr("y", fontSize + 2)
+            .attr("font-size", fontSize * 0.88)
+            .attr("font-family", "Inter, Arial, sans-serif")
+            .attr("fill", "#fff")
+            .attr("font-weight", 300)
+            .attr("letter-spacing", "-0.01em")
+            .attr("pointer-events", "none")
+            .text(
+              d.country.length < 18
+                ? d.country.toUpperCase()
+                : d.country.slice(0, 17).toUpperCase() + "…"
+            );
+          if (d.value) {
+            g.append("text")
+              .attr("x", 4)
+              .attr("y", fontSize * 2 + 2)
+              .attr("font-size", Math.max(8, fontSize * 0.74))
+              .attr("font-family", "Inter, Arial, sans-serif")
+              .attr("fill", "#fff")
+              .attr("font-weight", 300)
+              .attr("letter-spacing", "0.08em")
+              .attr("pointer-events", "none")
+              .text(formatValue(d.value));
+          }
+        }
+      });
+  }, [
+    data,
+    animValue,
+    years,
+    selectedRegions,
+    countryFocus,
+    freeForAll,
+    proportional,
+    width,
+    height,
+  ]);
+
+  useEffect(() => {
+    if (typeof selectedRegions === "undefined") {
+      setSelectedRegions(null);
+    }
+    // eslint-disable-next-line
+  }, []);
+
+  const selectedArr = Array.isArray(selectedRegions) ? selectedRegions : [];
+  const roundedYear = Math.round(animValue);
+
+  function handlePlayPause() {
+    if (playing) {
+      const snapped = Math.round(animValue);
+      onYearChange(snapped);
+      setPlaying(false);
+    } else {
+      if (animValue >= years[years.length - 1] - 0.01) {
+        onYearChange(years[0]);
+        setTimeout(() => setPlaying(true), 0);
+      } else {
+        setPlaying(true);
+      }
+    }
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="flex flex-col items-center gap-4 w-full"
+      style={{
+        flex: 1,
+        minHeight: 0,
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
+      {/* TOOLTIP */}
+      {tooltip.show && (
+        <div
+          style={{
+            position: "fixed",
+            pointerEvents: "none",
+            top: tooltip.y - 70,
+            left: tooltip.x - 100,
+            background: "rgba(22,28,40,0.97)",
+            color: "#fff",
+            borderRadius: 10,
+            padding: "9px 15px",
+            fontSize: 16,
+            fontFamily: "Inter, Arial, sans-serif",
+            fontWeight: 300,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+            minWidth: 120,
+            zIndex: 1001,
+            boxShadow: "0 4px 24px #1116"
+          }}
+          dangerouslySetInnerHTML={{ __html: tooltip.content }}
+        />
+      )}
+
+      {/* Boutons multi/single sélection */}
+      <div className="flex flex-wrap gap-3 justify-center p-4 rounded-2xl">
+        <button
+          onClick={handleFreeForAllClick}
+          className={`region-btn${freeForAll ? " region-btn--active" : ""}`}
+          style={freeForAll ? { background: "#555", color: "#fff" } : {}}
+        >
+          Free for all
+        </button>
+        <button
+          onClick={handleWorldClick}
+          className={`region-btn${!freeForAll ? " region-btn--active" : ""}`}
+        >
+          🌍 World
+        </button>
+        {REGION_LIST.filter((region) => region !== "Other").map((region) => (
+          <button
+            key={region}
+            onClick={() =>
+              selectedArr.includes(region)
+                ? handleRegionToggle(region)
+                : handleRegionClick(region)
+            }
+            className={`region-btn${
+              selectedArr.includes(region)
+                ? " region-btn--active"
+                : ""
+            }`}
+            style={
+              selectedArr.includes(region)
+                ? {
+                    background: `${regionColors(region)}22`,
+                    boxShadow: `0 0 0 3px ${regionColors(
+                      region
+                    )}80, 0 4px 24px #2223`,
+                  }
+                : {}
+            }
+          >
+            {region}
+          </button>
+        ))}
+      </div>
+
+      {/* Contrôles animation alignés */}
+      <div className="center-controls-wrapper flex items-center gap-6 w-full"
+        style={{ minWidth: 300, maxWidth: 1280, margin: "0 auto" }}>
+        <div className="shrink-0 flex items-center">
+          <PlayPauseButton
+            playing={playing}
+            onClick={handlePlayPause}
+            size={48}
+            disabled={years.length < 2}
+          />
+        </div>
+        {/* Slider */}
+        <div className="flex-1 flex items-center justify-center min-w-[180px]">
+          <input
+            type="range"
+            min={years[0]}
+            max={years[years.length - 1]}
+            step={0.01}
+            value={animValue}
+            onChange={e => {
+              setPlaying(false);
+              onYearChange(Math.round(Number(e.target.value)));
+            }}
+            className="w-full h-2 bg-white/30 rounded-lg appearance-none cursor-pointer accent-blue-400"
+            style={{ minWidth: 120, maxWidth: 350 }}
+          />
+        </div>
+        {/* Année */}
+        <div className="flex flex-col justify-center items-center min-w-[72px]">
+          <select
+            value={roundedYear}
+            onChange={e => {
+              setPlaying(false);
+              onYearChange(Number(e.target.value));
+            }}
+            className="select-glass px-3 py-2 text-lg font-bold text-center"
+            style={{ minWidth: 64 }}
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
+        {/* Focus Country select + Proportional selector à droite */}
+        <div className="flex flex-col justify-center items-center min-w-[180px] ml-2"
+          style={{ marginTop: 0 }}>
+          <div className="flex items-center gap-4 w-full justify-center">
+            <select
+              id="countryFocus"
+              value={countryFocus ?? ""}
+              onChange={(e) => setCountryFocus(e.target.value || null)}
+              className="select-glass px-3 py-2 min-w-[100px] w-full"
+            >
+              <option value="">Focused Country</option>
+              {countryList.map((country) => (
+                <option key={country} value={country}>
+                  {country}
+                </option>
+              ))}
+            </select>
+            {countryFocus && (
+              <span
+                onClick={() => setCountryFocus(null)}
+                className="text-white text-sm cursor-pointer select-none"
+                style={{ padding: "3px 10px" }}
+                title="Clear"
+              >
+                Clear
+              </span>
+            )}
+            <select
+              id="proportionalSelect"
+              value={proportional ? "proportional" : "non-proportional"}
+              onChange={(e) =>
+                setProportional(e.target.value === "proportional")
+              }
+              className="select-glass px-3 py-2 min-w-[100px]"
+              title="Choose proportional sizing mode"
+            >
+              <option value="proportional">Proportional</option>
+              <option value="non-proportional">Non Proportional</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* SVG */}
+      <div
+        className="w-full overflow-x-auto"
+        style={{ flex: 1, minHeight: 0,  alignItems: "stretch" }}
+      >
+        <svg
+          ref={svgRef}
+          width={width}
+          height={height}
+          onMouseLeave={hideTooltip} // ← ici !
+
+          style={{
+            display: "block",
+            minWidth: 360,
+            minHeight: 320,
+            maxWidth: "100%",
+            maxHeight: "100%",
+          }}
+        ></svg>
+      </div>
+    </div>
+  );
+}
