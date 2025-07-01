@@ -167,7 +167,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Content : graph 100% largeur */}
+      {/* Content : graph 100% largeur */}
       <div
         className="w-full flex flex-col"
         style={{
@@ -196,7 +196,6 @@ export default function Home() {
             proportional={proportional}
             setProportional={setProportional}
             mode={mode}
-            isPerCapita={false}
           />
         )}
         {graph === "barchart" && (
@@ -232,7 +231,6 @@ export default function Home() {
             proportional={proportional}
             setProportional={setProportional}
             mode={mode}
-            isPerCapita={true}
           />
         )}
         {graph === "barchart_percap" && (
