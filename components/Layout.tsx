@@ -13,8 +13,7 @@ function LogoHeader() {
       fit: Fit.Contain,
       alignment: Alignment.Center,
     }),
-    backgroundColor: "transparent",
-  });
+    });
   return (
     <a
       href="https://www.lucasmassoni.com/"
