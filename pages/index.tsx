@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import AnimatedTreemapGDP from "../components/AnimatedTreemapGDP";
 import BarChartRace from "../components/BarChartRace";
 
-function findClosestYear(target, years) {
+function findClosestYear(target: number, years: number[]) {
   if (!years || years.length === 0) return null;
   return years.reduce((prev, curr) =>
     Math.abs(curr - target) < Math.abs(prev - target) ? curr : prev
@@ -25,6 +25,7 @@ export default function Home() {
   const [selectedRegions, setSelectedRegions] = useState<null | string[]>(null);
   const [proportional, setProportional] = useState(true);
 
+  // --- Chargement des données GDP total
   useEffect(() => {
     fetch("/data/gdp_by_country_year_with_region.json")
       .then((res) => res.json())
@@ -41,6 +42,7 @@ export default function Home() {
     // eslint-disable-next-line
   }, []);
 
+  // --- Chargement des données GDP per capita
   useEffect(() => {
     fetch("/data/gdp_per_capita_by_country_year.json")
       .then((res) => res.json())
@@ -52,6 +54,7 @@ export default function Home() {
       });
   }, []);
 
+  // --- Gère la synchro année/graph
   useEffect(() => {
     if (activeYear == null) return;
     let targetYears: number[] = [];
@@ -70,6 +73,7 @@ export default function Home() {
     // eslint-disable-next-line
   }, [graph, years, yearsPerCapita]);
 
+  // --- Animation : changement d'année contrôlé
   const handleYearChange = (val: number | ((v: number) => number)) => {
     setAnimValue((prev) =>
       typeof val === "function" ? val(prev ?? activeYear ?? years[0]) : val
@@ -179,12 +183,12 @@ export default function Home() {
           flexDirection: "column",
         }}
       >
+        {/* -------- TREEMAP -------- */}
         {graph === "treemap" && (
           <AnimatedTreemapGDP
             data={currentData}
             years={currentYears}
-            year={activeYear}
-            animValue={animValue}
+            animValue={animValue!}
             playing={playing}
             setPlaying={setPlaying}
             onYearChange={handleYearChange}
@@ -201,12 +205,13 @@ export default function Home() {
             isPerCapita={false}
           />
         )}
+        {/* -------- BAR CHART -------- */}
         {graph === "barchart" && (
           <BarChartRace
             data={currentData}
             years={currentYears}
-            year={activeYear}
-            animValue={animValue}
+            year={activeYear!}
+            animValue={animValue!}
             playing={playing}
             setPlaying={setPlaying}
             onYearChange={handleYearChange}
@@ -217,12 +222,12 @@ export default function Home() {
             isPerCapita={false}
           />
         )}
+        {/* -------- TREEMAP PER CAPITA -------- */}
         {graph === "treemap_percap" && (
           <AnimatedTreemapGDP
             data={currentData}
             years={currentYears}
-            year={activeYear}
-            animValue={animValue}
+            animValue={animValue!}
             playing={playing}
             setPlaying={setPlaying}
             onYearChange={handleYearChange}
@@ -239,12 +244,13 @@ export default function Home() {
             isPerCapita={true}
           />
         )}
+        {/* -------- BAR CHART PER CAPITA -------- */}
         {graph === "barchart_percap" && (
           <BarChartRace
             data={currentData}
             years={currentYears}
-            year={activeYear}
-            animValue={animValue}
+            year={activeYear!}
+            animValue={animValue!}
             playing={playing}
             setPlaying={setPlaying}
             onYearChange={handleYearChange}
