@@ -22,9 +22,9 @@ function formatNumberSpace(n: number) {
   return n.toLocaleString("fr-FR").replace(/\u202f/g, " ");
 }
 
-// Typage des props principales
+// Props typing
 interface AnimatedTreemapGDPProps {
-  data: any[]; // Tu peux préciser si tu veux
+  data: { year: number; gdp: number; country: string; region: string }[];
   years: number[];
   animValue: number;
   playing: boolean;
@@ -33,7 +33,7 @@ interface AnimatedTreemapGDPProps {
   countryFocus: string | null;
   setCountryFocus: (c: string | null) => void;
   selectedRegions: string[] | null;
-  setSelectedRegions: React.Dispatch<React.SetStateAction<string[] | null>>;  // <-- CORRECT ici !
+  setSelectedRegions: React.Dispatch<React.SetStateAction<string[] | null>>;
   freeForAll: boolean;
   setFreeForAll: (v: boolean) => void;
   proportional: boolean;
@@ -41,11 +41,10 @@ interface AnimatedTreemapGDPProps {
   mode: any;
 }
 
-
 export default function AnimatedTreemapGDP({
-  data,
-  years,
-  animValue,
+  data = [],
+  years = [],
+  animValue = 0,
   playing,
   setPlaying,
   onYearChange,
@@ -89,7 +88,11 @@ export default function AnimatedTreemapGDP({
   const [countryList, setCountryList] = useState<string[]>([]);
   const [focusData, setFocusData] = useState<any>(null);
 
-  const isPerCapita = data && data.length && d3.max(data, d => d.gdp) < 5_000_000;
+  // --- Calcul safe du mode per capita
+  const isPerCapita =
+    Array.isArray(data) && data.length && d3.max(data, d => d.gdp) !== undefined
+      ? d3.max(data, d => d.gdp)! < 5_000_000
+      : false;
 
   function formatValue(val: number) {
     if (isPerCapita) {
@@ -100,7 +103,7 @@ export default function AnimatedTreemapGDP({
   }
 
   function getHierarchy(
-    data: any[],
+    data: AnimatedTreemapGDPProps["data"],
     year: number,
     selectedRegions: string[],
     freeForAll = false
@@ -139,6 +142,7 @@ export default function AnimatedTreemapGDP({
 
   function mapTreemapNodes(root: any) {
     const map = new Map<string, any>();
+    if (!root.leaves) return map;
     root.leaves().forEach((d: any) => {
       map.set((d.parent?.data.name ?? "") + "|" + d.data.name, {
         x0: d.x0,
@@ -156,8 +160,7 @@ export default function AnimatedTreemapGDP({
     return Math.max(minFont, Math.min(maxFont, Math.sqrt(area) / 5));
   }
 
-  // --------- Correction ici ! ---------
-  // selectedRegions est TOUJOURS un array (jamais "ALL"), sinon on prend tout sauf "Other"
+  // --- selectedRegions est TOUJOURS array, sinon tout sauf Other
   const safeSelectedRegions =
     !selectedRegions || selectedRegions.length === 0
       ? REGION_LIST.filter((r) => r !== "Other")
@@ -233,8 +236,9 @@ export default function AnimatedTreemapGDP({
     if (wasPlaying) setTimeout(() => setPlaying(true), 0);
   }
 
+  // --- Core Treemap rendering
   useEffect(() => {
-    if (!svgRef.current || data.length === 0 || years.length === 0) return;
+    if (!svgRef.current || !Array.isArray(data) || data.length === 0 || years.length === 0) return;
     const y1 = Math.floor(animValue);
     const y2 = Math.ceil(animValue);
     const t = animValue - y1;
@@ -242,12 +246,11 @@ export default function AnimatedTreemapGDP({
 
     const y1Clamped = Math.max(years[0], Math.min(years[years.length - 1], y1));
     const y2Clamped = Math.max(years[0], Math.min(years[years.length - 1], y2));
-    const PADDING_TOP = freeForAll ? 0 : 0;
+    const PADDING_TOP = 0;
     const PADDING_INNER = 2;
     const PADDING_OUTER = 2;
 
-    let k1 = 1,
-      k2 = 1;
+    let k1 = 1, k2 = 1;
     if (proportional) {
       const maxTotal =
         d3.max(years, (y) => {
@@ -325,9 +328,42 @@ export default function AnimatedTreemapGDP({
       d.y1 += ((1 - k2) / 2) * height;
     });
 
-    const m1 = mapTreemapNodes(h1),
-      m2 = mapTreemapNodes(h2);
+    const m1 = mapTreemapNodes(h1);
+    const m2 = mapTreemapNodes(h2);
 
+    const leaves = Array.from(new Set([...m1.keys(), ...m2.keys()]));
+    const nodes = leaves
+      .map((key) => {
+        const a = m1.get(key);
+        const b = m2.get(key);
+        if (!a && !b) return null;
+        const x0 = a && b ? (1 - t) * a.x0 + t * b.x0 : a ? a.x0 : b.x0;
+        const x1 = a && b ? (1 - t) * a.x1 + t * b.x1 : a ? a.x1 : b.x1;
+        const y0 = a && b ? (1 - t) * a.y0 + t * b.y0 : a ? a.y0 : b.y0;
+        const y1 = a && b ? (1 - t) * a.y1 + t * b.y1 : a ? a.y1 : b.y1;
+        const value =
+          a && b ? (1 - t) * a.value + t * b.value : a ? a.value : b.value;
+        const region = (a && a.region) || (b && b.region);
+        const [_, country] = key.split("|");
+        return { x0, x1, y0, y1, value, region, country };
+      })
+      .filter(Boolean) as any[];
+
+    setCountryList(
+      nodes
+        .map((n) => n.country)
+        .filter((v, i, arr) => arr.indexOf(v) === i)
+        .sort()
+    );
+
+    if (countryFocus) {
+      const f = nodes.find((n) => n.country === countryFocus);
+      setFocusData(f);
+    } else {
+      setFocusData(null);
+    }
+
+    // Render SVG
     const svg = d3
       .select(svgRef.current)
       .attr("viewBox", `0 -30 ${width} ${height + 50}`)
@@ -364,38 +400,6 @@ export default function AnimatedTreemapGDP({
     const regionFontSizeMap: Record<string, number> = {};
     for (const r of regionLabelData) {
       regionFontSizeMap[r.name] = r.fontSize;
-    }
-
-    const leaves = Array.from(new Set([...m1.keys(), ...m2.keys()]));
-    const nodes = leaves
-      .map((key) => {
-        const a = m1.get(key);
-        const b = m2.get(key);
-        if (!a && !b) return null;
-        const x0 = a && b ? (1 - t) * a.x0 + t * b.x0 : a ? a.x0 : b.x0;
-        const x1 = a && b ? (1 - t) * a.x1 + t * b.x1 : a ? a.x1 : b.x1;
-        const y0 = a && b ? (1 - t) * a.y0 + t * b.y0 : a ? a.y0 : b.y0;
-        const y1 = a && b ? (1 - t) * a.y1 + t * b.y1 : a ? a.y1 : b.y1;
-        const value =
-          a && b ? (1 - t) * a.value + t * b.value : a ? a.value : b.value;
-        const region = (a && a.region) || (b && b.region);
-        const [_, country] = key.split("|");
-        return { x0, x1, y0, y1, value, region, country };
-      })
-      .filter(Boolean) as any[];
-
-    setCountryList(
-      nodes
-        .map((n) => n.country)
-        .filter((v, i, arr) => arr.indexOf(v) === i)
-        .sort()
-    );
-
-    if (countryFocus) {
-      const f = nodes.find((n) => n.country === countryFocus);
-      setFocusData(f);
-    } else {
-      setFocusData(null);
     }
 
     const group = svg.append("g").attr("class", "treemap");

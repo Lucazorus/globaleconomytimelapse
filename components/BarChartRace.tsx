@@ -4,12 +4,10 @@ import * as d3 from "d3";
 import { REGION_LIST, regionColors } from "./Colors";
 import PlayPauseButton from "./PlayPauseButton";
 
-// Format espace pour les milliers, jamais de virgule ni de point
+// Format espace pour les milliers
 function formatNumberSpace(num: number) {
   if (typeof num !== "number" || isNaN(num)) return "";
-  return num
-    .toFixed(0)
-    .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
 const margin = { top: 40, right: 40, bottom: 60, left: 40 };
@@ -18,8 +16,16 @@ const barPadding = 8;
 const topN = 18;
 const MIN_BAR_LABEL_WIDTH = 100;
 
+interface CountryData {
+  year: number;
+  gdp: number;
+  country: string;
+  region: string;
+  [key: string]: any; // fallback pour compatibilité données non typées
+}
+
 interface BarChartRaceProps {
-  data: any[];
+  data: CountryData[];
   years: number[];
   year: number;
   animValue: number;
@@ -29,15 +35,15 @@ interface BarChartRaceProps {
   countryFocus: string | null;
   setCountryFocus: (v: string | null) => void;
   selectedRegions: string[] | null;
-  setSelectedRegions: React.Dispatch<React.SetStateAction<string[] | null>>; // <- Ici la modif
+  setSelectedRegions: React.Dispatch<React.SetStateAction<string[] | null>>;
   isPerCapita?: boolean;
 }
 
 export default function BarChartRace({
-  data,
-  years,
-  year,
-  animValue,
+  data = [],
+  years = [],
+  year = 0,
+  animValue = 0,
   playing,
   setPlaying,
   onYearChange,
@@ -51,10 +57,11 @@ export default function BarChartRace({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 760 });
 
+  // Safe resizing
   useEffect(() => {
-    if (!containerRef.current) return;
     function handleResize() {
-      const width = containerRef.current!.offsetWidth || 1200;
+      if (!containerRef.current) return;
+      const width = containerRef.current.offsetWidth || 1200;
       const barsHeight = topN * (barHeight + barPadding) + margin.top + margin.bottom;
       setContainerSize({
         width: Math.max(360, width),
@@ -63,7 +70,7 @@ export default function BarChartRace({
     }
     handleResize();
     const observer = new window.ResizeObserver(handleResize);
-    observer.observe(containerRef.current);
+    if (containerRef.current) observer.observe(containerRef.current);
     window.addEventListener("resize", handleResize);
     return () => {
       observer.disconnect();
@@ -74,20 +81,26 @@ export default function BarChartRace({
   const width = containerSize.width;
   const height = containerSize.height;
 
+  // Pour l’animation (toujours frais dans closures)
   const playingRef = useRef(playing);
   const yearRef = useRef(year);
   useEffect(() => { playingRef.current = playing; }, [playing]);
   useEffect(() => { yearRef.current = year; }, [year]);
 
+  // Liste des régions affichables (jamais "Other")
   const regionListClean = REGION_LIST.filter(r => r !== "Other");
-
   const getRegionsArray = () =>
     !selectedRegions || selectedRegions.length === 0
       ? regionListClean
       : selectedRegions.filter(r => r !== "Other");
 
-  const createKeyframes = (data: any[], years: number[], regions: string[] = regionListClean) =>
-    years.map((year) => {
+  // Génère les keyframes pour chaque année
+  function createKeyframes(
+    data: CountryData[],
+    years: number[],
+    regions: string[] = regionListClean
+  ): [number, CountryData[], number][] {
+    return years.map((year) => {
       let yearData = data.filter(
         (d) =>
           d.year === year &&
@@ -102,8 +115,9 @@ export default function BarChartRace({
       const maxValue = Math.max(0, ...sorted.map((d) => d.gdp));
       return [year, sorted, maxValue];
     });
+  }
 
-  // ToolTip
+  // ToolTip logic
   function useTooltip() {
     const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
     function showTooltip(x: number, y: number, content: string) { setTooltip({ show: true, x, y, content }); }
@@ -112,7 +126,7 @@ export default function BarChartRace({
   }
   const { tooltip, showTooltip, hideTooltip } = useTooltip();
 
-  // LABELS
+  // LABELS logic
   const labels = (svg: any) => {
     const x = d3.scaleLinear().range([margin.left, width - margin.right]);
     const y = (_d: any, i: number) => margin.top + i * (barHeight + barPadding);
@@ -135,7 +149,6 @@ export default function BarChartRace({
           valueX = x(d.gdp) + 24 + d.country.length * 10;
           anchor = "start";
         }
-        // Nom du pays
         svg.append("text")
           .attr("class", "country-label")
           .attr("x", countryX)
@@ -155,7 +168,6 @@ export default function BarChartRace({
           )
           .on("click", () => setCountryFocus(d.country));
 
-        // Valeur (toujours espace pour les milliers, affichage selon isPerCapita)
         let valueLabel = isPerCapita
           ? `$${formatNumberSpace(d.gdp)}`
           : `$${formatNumberSpace(Math.round(d.gdp / 1e6) / 1e3)}B`;
@@ -179,7 +191,7 @@ export default function BarChartRace({
     };
   };
 
-  // BARS
+  // BARS logic
   const bars = (svg: any) => {
     const x = d3.scaleLinear().range([margin.left, width - margin.right]);
     const y = (_d: any, i: number) => margin.top + i * (barHeight + barPadding);
@@ -258,7 +270,7 @@ export default function BarChartRace({
     };
   };
 
-  // Animation
+  // Animation (barres)
   useEffect(() => {
     if (!playing || !year || data.length === 0 || years.length === 0) return;
     let animating = true;
@@ -301,13 +313,13 @@ export default function BarChartRace({
 
     const regionsArray = getRegionsArray();
 
-    const kf1 = createKeyframes(data, [y1Clamped], regionsArray)[0];
-    const kf2 = createKeyframes(data, [y2Clamped], regionsArray)[0];
+    const kf1 = createKeyframes(data, [y1Clamped], regionsArray)[0] as [number, CountryData[], number];
+    const kf2 = createKeyframes(data, [y2Clamped], regionsArray)[0] as [number, CountryData[], number];
 
     // Interpolation pays par pays
     const mergedCountries = new Map<string, any>();
-    for (const d of kf1[1]) mergedCountries.set(d.country, { ...d, gdp1: d.gdp, gdp2: 0 });
-    for (const d of kf2[1]) {
+    if (kf1 && Array.isArray(kf1[1])) for (const d of kf1[1]) mergedCountries.set(d.country, { ...d, gdp1: d.gdp, gdp2: 0 });
+    if (kf2 && Array.isArray(kf2[1])) for (const d of kf2[1]) {
       if (mergedCountries.has(d.country))
         mergedCountries.get(d.country)!.gdp2 = d.gdp;
       else
@@ -333,11 +345,11 @@ export default function BarChartRace({
     const updateBars = bars(svg);
     const updateLabels = labels(svg);
 
-    const keyframeInterp = [interpYear, interpTop, interpMax];
+    const keyframeInterp: [number, CountryData[], number] = [interpYear, interpTop, interpMax];
     updateBars(keyframeInterp, null);
     updateLabels(keyframeInterp, null);
 
-    // Axe X avec le bon formatage
+    // Axe X formaté
     const x = d3.scaleLinear()
       .range([margin.left, width - margin.right])
       .domain([0, interpMax * 1.08]);
@@ -359,7 +371,7 @@ export default function BarChartRace({
       .attr("font-family", "Inter, sans-serif");
   }, [animValue, selectedRegions, data, years, countryFocus, isPerCapita, width, height]);
 
-  // --- Sélection régions ---
+  // --- Sélection régions
   const toggleRegion = (region: string) => {
     if (region === "Other") return;
     setSelectedRegions(current => {
@@ -408,7 +420,6 @@ export default function BarChartRace({
 
   if (!year || years.length === 0) return <div>Loading…</div>;
 
-  // Tooltip HTML
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-4 mt-4 w-full">
       <div className="flex flex-wrap gap-3 justify-center p-4 rounded-2xl bg-white/10 shadow-2xl backdrop-blur-md">
