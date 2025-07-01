@@ -24,7 +24,7 @@ function formatNumberSpace(n: number) {
 
 // Typage des props principales
 interface AnimatedTreemapGDPProps {
-  data: any[]; // Typage à affiner si tu veux (ex: Array<{...}>)
+  data: any[]; // Tu peux préciser si tu veux
   years: number[];
   animValue: number;
   playing: boolean;
@@ -33,13 +33,14 @@ interface AnimatedTreemapGDPProps {
   countryFocus: string | null;
   setCountryFocus: (c: string | null) => void;
   selectedRegions: string[] | null;
-  setSelectedRegions: (r: string[] | null) => void;
+  setSelectedRegions: React.Dispatch<React.SetStateAction<string[] | null>>;  // <-- CORRECT ici !
   freeForAll: boolean;
   setFreeForAll: (v: boolean) => void;
   proportional: boolean;
   setProportional: (v: boolean) => void;
-  mode: any; // tu peux préciser le type si tu as
+  mode: any;
 }
+
 
 export default function AnimatedTreemapGDP({
   data,

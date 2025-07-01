@@ -19,7 +19,7 @@ const topN = 18;
 const MIN_BAR_LABEL_WIDTH = 100;
 
 interface BarChartRaceProps {
-  data: any[]; // à typer si tu veux
+  data: any[];
   years: number[];
   year: number;
   animValue: number;
@@ -29,7 +29,7 @@ interface BarChartRaceProps {
   countryFocus: string | null;
   setCountryFocus: (v: string | null) => void;
   selectedRegions: string[] | null;
-  setSelectedRegions: (v: string[] | null) => void;
+  setSelectedRegions: React.Dispatch<React.SetStateAction<string[] | null>>; // <- Ici la modif
   isPerCapita?: boolean;
 }
 
@@ -45,9 +45,8 @@ export default function BarChartRace({
   setCountryFocus,
   selectedRegions,
   setSelectedRegions,
-  isPerCapita = false, // <--- NOUVEAU PROP !
+  isPerCapita = false,
 }: BarChartRaceProps) {
-  // ---- Responsive
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 760 });
@@ -82,7 +81,6 @@ export default function BarChartRace({
 
   const regionListClean = REGION_LIST.filter(r => r !== "Other");
 
-  // Nouvelle logique : selectedRegions est toujours array ou null, jamais "ALL"
   const getRegionsArray = () =>
     !selectedRegions || selectedRegions.length === 0
       ? regionListClean
@@ -364,16 +362,17 @@ export default function BarChartRace({
   // --- Sélection régions ---
   const toggleRegion = (region: string) => {
     if (region === "Other") return;
-    if (!selectedRegions || selectedRegions.length === 0) {
-      setSelectedRegions([region]);
-    } else {
-      if (selectedRegions.includes(region)) {
-        const next = selectedRegions.filter((r) => r !== region);
-        setSelectedRegions(next.length === 0 ? null : next);
-      } else {
-        setSelectedRegions([...selectedRegions, region]);
+    setSelectedRegions(current => {
+      if (!current || current.length === 0) {
+        return [region];
       }
-    }
+      if (current.includes(region)) {
+        const next = current.filter((r) => r !== region);
+        return next.length === 0 ? null : next;
+      } else {
+        return [...current, region];
+      }
+    });
   };
   const selectAllRegions = () => {
     setSelectedRegions(null);
