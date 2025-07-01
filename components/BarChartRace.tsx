@@ -5,7 +5,7 @@ import { REGION_LIST, regionColors } from "./Colors";
 import PlayPauseButton from "./PlayPauseButton";
 
 // Format espace pour les milliers, jamais de virgule ni de point
-function formatNumberSpace(num) {
+function formatNumberSpace(num: number) {
   if (typeof num !== "number" || isNaN(num)) return "";
   return num
     .toFixed(0)
@@ -17,6 +17,21 @@ const barHeight = 32;
 const barPadding = 8;
 const topN = 18;
 const MIN_BAR_LABEL_WIDTH = 100;
+
+interface BarChartRaceProps {
+  data: any[]; // à typer si tu veux
+  years: number[];
+  year: number;
+  animValue: number;
+  playing: boolean;
+  setPlaying: (v: boolean) => void;
+  onYearChange: (v: any) => void;
+  countryFocus: string | null;
+  setCountryFocus: (v: string | null) => void;
+  selectedRegions: string[] | null;
+  setSelectedRegions: (v: string[] | null) => void;
+  isPerCapita?: boolean;
+}
 
 export default function BarChartRace({
   data,
@@ -31,16 +46,16 @@ export default function BarChartRace({
   selectedRegions,
   setSelectedRegions,
   isPerCapita = false, // <--- NOUVEAU PROP !
-}) {
+}: BarChartRaceProps) {
   // ---- Responsive
-  const containerRef = useRef(null);
-  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 760 });
 
   useEffect(() => {
     if (!containerRef.current) return;
     function handleResize() {
-      const width = containerRef.current.offsetWidth || 1200;
+      const width = containerRef.current!.offsetWidth || 1200;
       const barsHeight = topN * (barHeight + barPadding) + margin.top + margin.bottom;
       setContainerSize({
         width: Math.max(360, width),
@@ -67,21 +82,20 @@ export default function BarChartRace({
 
   const regionListClean = REGION_LIST.filter(r => r !== "Other");
 
+  // Nouvelle logique : selectedRegions est toujours array ou null, jamais "ALL"
   const getRegionsArray = () =>
-    selectedRegions === "ALL" || !Array.isArray(selectedRegions) || selectedRegions === null
+    !selectedRegions || selectedRegions.length === 0
       ? regionListClean
       : selectedRegions.filter(r => r !== "Other");
 
-  const createKeyframes = (data, years, regions = regionListClean) =>
+  const createKeyframes = (data: any[], years: number[], regions: string[] = regionListClean) =>
     years.map((year) => {
       let yearData = data.filter(
         (d) =>
           d.year === year &&
           d.gdp > 0 &&
           d.region && d.region !== "Other" &&
-          (regions === "ALL"
-            ? regionListClean.includes(d.region)
-            : regions.includes(d.region))
+          regions.includes(d.region)
       );
       const sorted = yearData
         .sort((a, b) => b.gdp - a.gdp)
@@ -94,23 +108,23 @@ export default function BarChartRace({
   // ToolTip
   function useTooltip() {
     const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
-    function showTooltip(x, y, content) { setTooltip({ show: true, x, y, content }); }
+    function showTooltip(x: number, y: number, content: string) { setTooltip({ show: true, x, y, content }); }
     function hideTooltip() { setTooltip({ show: false, x: 0, y: 0, content: "" }); }
     return { tooltip, showTooltip, hideTooltip };
   }
   const { tooltip, showTooltip, hideTooltip } = useTooltip();
 
   // LABELS
-  const labels = (svg) => {
+  const labels = (svg: any) => {
     const x = d3.scaleLinear().range([margin.left, width - margin.right]);
-    const y = (_d, i) => margin.top + i * (barHeight + barPadding);
-    return (keyframe, transition) => {
+    const y = (_d: any, i: number) => margin.top + i * (barHeight + barPadding);
+    return (keyframe: any, transition: any) => {
       const [_, data, maxValue] = keyframe;
       x.domain([0, maxValue * 1.08]);
       svg.selectAll("text.country-label").remove();
       svg.selectAll("text.value-label").remove();
 
-      data.forEach((d, i) => {
+      data.forEach((d: any, i: number) => {
         const barLen = x(d.gdp) - margin.left;
         let countryX, valueX, anchor;
         let showOutside = barLen < MIN_BAR_LABEL_WIDTH;
@@ -168,34 +182,33 @@ export default function BarChartRace({
   };
 
   // BARS
-  const bars = (svg) => {
+  const bars = (svg: any) => {
     const x = d3.scaleLinear().range([margin.left, width - margin.right]);
-    const y = (_d, i) => margin.top + i * (barHeight + barPadding);
-    return (keyframe, transition) => {
+    const y = (_d: any, i: number) => margin.top + i * (barHeight + barPadding);
+    return (keyframe: any, transition: any) => {
       const [_, data, maxValue] = keyframe;
       x.domain([0, maxValue * 1.08]);
       const bar = svg
         .selectAll("g.bar")
-        .data(data, (d) => d.country)
+        .data(data, (d: any) => d.country)
         .join(
-          (enter) => {
+          (enter: any) => {
             const g = enter.append("g").attr("class", "bar");
-            g.attr("transform", (_d, i) => `translate(0,${y(_d, i)})`);
+            g.attr("transform", (_d: any, i: number) => `translate(0,${y(_d, i)})`);
             g.append("rect")
               .attr("x", margin.left)
               .attr("y", 0)
               .attr("height", barHeight)
-              .attr("width", (d) => x(d.gdp) - margin.left)
-              .attr("fill", (d) =>
+              .attr("width", (d: any) => x(d.gdp) - margin.left)
+              .attr("fill", (d: any) =>
                 countryFocus && d.country === countryFocus
                   ? "#FA003F"
                   : regionColors(d.region)
               )
               .attr("rx", 2)
               .attr("cursor", "pointer")
-              .on("click", (_e, d) => setCountryFocus(d.country))
-              .on("mousemove", function (e, d) {
-                // Tooltip comme Treemap
+              .on("click", (_e: any, d: any) => setCountryFocus(d.country))
+              .on("mousemove", function (e: any, d: any) {
                 let valueLabel = isPerCapita
                   ? `$${formatNumberSpace(d.gdp)}`
                   : `$${formatNumberSpace(Math.round(d.gdp / 1e6) / 1e3)}B`;
@@ -208,28 +221,28 @@ export default function BarChartRace({
               .on("mouseleave", hideTooltip);
             return g;
           },
-          (update) => {
-            update.attr("transform", (_d, i) => `translate(0,${y(_d, i)})`);
+          (update: any) => {
+            update.attr("transform", (_d: any, i: number) => `translate(0,${y(_d, i)})`);
             update
               .select("rect")
-              .attr("fill", (d) =>
+              .attr("fill", (d: any) =>
                 countryFocus && d.country === countryFocus
                   ? "#FA003F"
                   : regionColors(d.region)
               );
             return update;
           },
-          (exit) => exit.remove()
+          (exit: any) => exit.remove()
         );
       if (transition) {
         bar
           .transition(transition)
-          .attr("transform", (_d, i) => `translate(0,${y(_d, i)})`);
+          .attr("transform", (_d: any, i: number) => `translate(0,${y(_d, i)})`);
         bar
           .select("rect")
           .transition(transition)
-          .attr("width", (d) => x(d.gdp) - margin.left)
-          .attr("fill", (d) =>
+          .attr("width", (d: any) => x(d.gdp) - margin.left)
+          .attr("fill", (d: any) =>
             countryFocus && d.country === countryFocus
               ? "#FA003F"
               : regionColors(d.region)
@@ -237,8 +250,8 @@ export default function BarChartRace({
       } else {
         bar
           .select("rect")
-          .attr("width", (d) => x(d.gdp) - margin.left)
-          .attr("fill", (d) =>
+          .attr("width", (d: any) => x(d.gdp) - margin.left)
+          .attr("fill", (d: any) =>
             countryFocus && d.country === countryFocus
               ? "#FA003F"
               : regionColors(d.region)
@@ -252,7 +265,7 @@ export default function BarChartRace({
     if (!playing || !year || data.length === 0 || years.length === 0) return;
     let animating = true;
     const tick = () => {
-      onYearChange((prev) => {
+      onYearChange((prev: number) => {
         if (!playingRef.current || !animating) return prev;
         const idx = years.indexOf(yearRef.current ?? years[0]);
         if (idx < years.length - 1) {
@@ -294,11 +307,11 @@ export default function BarChartRace({
     const kf2 = createKeyframes(data, [y2Clamped], regionsArray)[0];
 
     // Interpolation pays par pays
-    const mergedCountries = new Map();
+    const mergedCountries = new Map<string, any>();
     for (const d of kf1[1]) mergedCountries.set(d.country, { ...d, gdp1: d.gdp, gdp2: 0 });
     for (const d of kf2[1]) {
       if (mergedCountries.has(d.country))
-        mergedCountries.get(d.country).gdp2 = d.gdp;
+        mergedCountries.get(d.country)!.gdp2 = d.gdp;
       else
         mergedCountries.set(d.country, { ...d, gdp1: 0, gdp2: d.gdp });
     }
@@ -338,8 +351,8 @@ export default function BarChartRace({
         d3.axisTop(x)
           .ticks(5)
           .tickFormat(d => isPerCapita
-            ? `$${formatNumberSpace(d)}`
-            : `$${formatNumberSpace(Math.round(d / 1e6) / 1e3)}B`
+            ? `$${formatNumberSpace(Number(d))}`
+            : `$${formatNumberSpace(Math.round(Number(d) / 1e6) / 1e3)}B`
           )
       )
       .selectAll("text")
@@ -348,22 +361,22 @@ export default function BarChartRace({
       .attr("font-family", "Inter, sans-serif");
   }, [animValue, selectedRegions, data, years, countryFocus, isPerCapita, width, height]);
 
-  // ...Reste inchangé...
-  const toggleRegion = (region) => {
+  // --- Sélection régions ---
+  const toggleRegion = (region: string) => {
     if (region === "Other") return;
-    if (selectedRegions === "ALL" || !Array.isArray(selectedRegions)) {
+    if (!selectedRegions || selectedRegions.length === 0) {
       setSelectedRegions([region]);
     } else {
       if (selectedRegions.includes(region)) {
         const next = selectedRegions.filter((r) => r !== region);
-        setSelectedRegions(next.length === 0 ? "ALL" : next);
+        setSelectedRegions(next.length === 0 ? null : next);
       } else {
         setSelectedRegions([...selectedRegions, region]);
       }
     }
   };
   const selectAllRegions = () => {
-    setSelectedRegions("ALL");
+    setSelectedRegions(null);
   };
 
   function handlePlayPause() {
@@ -402,7 +415,7 @@ export default function BarChartRace({
       <div className="flex flex-wrap gap-3 justify-center p-4 rounded-2xl bg-white/10 shadow-2xl backdrop-blur-md">
         <button
           onClick={selectAllRegions}
-          className={`region-btn${selectedRegions === "ALL" ? " region-btn--active" : ""}`}
+          className={`region-btn${!selectedRegions || selectedRegions.length === 0 ? " region-btn--active" : ""}`}
         >
           🌍 World
         </button>
@@ -411,15 +424,15 @@ export default function BarChartRace({
             key={region}
             onClick={() => toggleRegion(region)}
             className={`region-btn${
-              selectedRegions !== "ALL" &&
-              Array.isArray(selectedRegions) &&
+              selectedRegions &&
+              selectedRegions.length > 0 &&
               selectedRegions.includes(region)
                 ? " region-btn--active"
                 : ""
             }`}
             style={
-              selectedRegions !== "ALL" &&
-              Array.isArray(selectedRegions) &&
+              selectedRegions &&
+              selectedRegions.length > 0 &&
               selectedRegions.includes(region)
                 ? {
                     background: `${regionColors(region)}22`,
@@ -493,27 +506,27 @@ export default function BarChartRace({
           )}
         </div>
       </div>
-<svg ref={svgRef} onMouseLeave={hideTooltip}></svg>
+      <svg ref={svgRef} onMouseLeave={hideTooltip}></svg>
       {/* Tooltip HTML (en dehors du SVG) */}
       {tooltip.show && (
         <div
           style={{
-position: "fixed",
-    pointerEvents: "none",
-    top: tooltip.y - 70,
-    left: tooltip.x - 100,
-    background: "rgba(22,28,40,0.97)",
-    color: "#fff",
-    borderRadius: 10,
-    padding: "9px 15px",
-    fontSize: 16,
-    fontFamily: "Inter, Arial, sans-serif",
-    fontWeight: 300,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    minWidth: 120,
-    zIndex: 1001,
-    boxShadow: "0 4px 24px #1116"
+            position: "fixed",
+            pointerEvents: "none",
+            top: tooltip.y - 70,
+            left: tooltip.x - 100,
+            background: "rgba(22,28,40,0.97)",
+            color: "#fff",
+            borderRadius: 10,
+            padding: "9px 15px",
+            fontSize: 16,
+            fontFamily: "Inter, Arial, sans-serif",
+            fontWeight: 300,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+            minWidth: 120,
+            zIndex: 1001,
+            boxShadow: "0 4px 24px #1116"
           }}
           dangerouslySetInnerHTML={{ __html: tooltip.content }}
         />
