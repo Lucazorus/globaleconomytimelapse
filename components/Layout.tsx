@@ -1,9 +1,16 @@
 "use client";
-import React from "react";
+import React, { ReactNode } from "react";
 import { Inter } from "next/font/google";
 import { useRive, Layout as RiveLayout, Fit, Alignment } from "@rive-app/react-canvas";
 const inter = Inter({ subsets: ["latin"] });
 
+// Typage des props
+interface LayoutProps {
+  children: ReactNode;
+  title?: string; // Optionnel, si tu veux passer un titre
+}
+
+// Composant LogoHeader (ne touche pas)
 function LogoHeader() {
   const { RiveComponent } = useRive({
     src: "/images/logo.riv",
@@ -13,7 +20,8 @@ function LogoHeader() {
       fit: Fit.Contain,
       alignment: Alignment.Center,
     }),
-    });
+    // Pas de backgroundColor ici : la prop n'existe pas (cf. doc Rive)
+  });
   return (
     <a
       href="https://www.lucasmassoni.com/"
@@ -44,7 +52,7 @@ function LogoHeader() {
   );
 }
 
-export default function Layout({ children }) {
+const Layout = ({ children, title }: LayoutProps) => {
   return (
     <div
       className={inter.className}
@@ -57,6 +65,12 @@ export default function Layout({ children }) {
         overflow: "hidden",
       }}
     >
+      {/* Balise <title> si besoin */}
+      {title && (
+        <head>
+          <title>{title}</title>
+        </head>
+      )}
       <header style={{ flexShrink: 0 }}>
         <div style={{ display: "inline-flex", alignItems: "stretch", background: "#1a2327", padding: "8px 24px 0 24px" }}>
           <LogoHeader />
@@ -125,4 +139,6 @@ export default function Layout({ children }) {
       </footer>
     </div>
   );
-}
+};
+
+export default Layout;
