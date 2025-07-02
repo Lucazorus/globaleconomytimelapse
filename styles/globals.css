@@ -16,14 +16,14 @@ html, body {
 
 /* === TITRES ET LABELS === */
 .title-glow {
-  font-size: 2.4rem;
+  font-size: 1.85rem; /* avant : 2.4rem */
   font-weight: 300;
   color: #e9eef4;
   letter-spacing: -1px;
   text-shadow: 0 3px 24px #1118, 0 0 1px #719CAF;
 }
 .year-big {
-  font-size: 5rem;
+  font-size: 3.7rem; /* avant : 5rem */
   font-weight: 300;
   color: #fff;
   opacity: 0.92;
@@ -37,10 +37,10 @@ html, body {
   background: none !important;
   border: none !important;
   box-shadow: none !important;
-  padding: 0.35rem 0.8rem;
-  margin: 0.1rem 0.12rem;
+  padding: 0.26rem 0.61rem; /* avant : 0.35rem 0.8rem */
+  margin: 0.07rem 0.09rem;
   font-family: inherit;
-  font-size: 1.01rem;
+  font-size: 0.76rem; /* avant : 1.01rem */
   font-weight: 300;
   color: #e9eef4;
   letter-spacing: 0.08em;
@@ -95,10 +95,10 @@ html, body {
   background: none !important;
   border: none !important;
   box-shadow: none !important;
-  padding: 0.47rem 1.19rem;           /* légèrement plus grand que region-btn */
-  margin: 0.14rem 0.26rem;
+  padding: 0.35rem 0.89rem;  /* avant : 0.47rem 1.19rem */
+  margin: 0.10rem 0.19rem;
   font-family: inherit;
-  font-size: 1.21rem;                 /* légèrement plus grand */
+  font-size: 0.93rem; /* avant : 1.21rem */
   font-weight: 400;
   color: #e9eef4;
   letter-spacing: 0.09em;
@@ -121,7 +121,7 @@ html, body {
   bottom: 0.11em;
   width: 0;
   height: 3px;
-  background: #fff;                       /* SOULIGNÉ BLANC PUR */
+  background: #fff;
   transition: width 0.34s cubic-bezier(.4,1.1,.23,1), left 0.24s;
   border-radius: 2px;
 }
@@ -148,7 +148,6 @@ html, body {
 /* === SLIDER MODERNE GLASS === */
 input[type="range"] {
   accent-color: #719CAF;
-  /* width: 100%;  ENLEVER cette ligne dans le css si tu utilises flex-1 dans le JSX !! */
   height: 4px;
   background: linear-gradient(90deg, #719CAF99 0%, #6FAF96cc 100%);
   border-radius: 8px;
@@ -158,38 +157,38 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 14px; /* avant : 18px */
+  height: 14px; /* avant : 18px */
   border-radius: 50%;
   background: #fff;
-  border: 3px solid #719CAF;
-  box-shadow: 0 0 10px #719CAF55;
+  border: 2px solid #719CAF; /* avant : 3px */
+  box-shadow: 0 0 7px #719CAF55;
   transition: box-shadow 0.2s;
 }
 input[type="range"]:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 5px #6FAF9622;
+  box-shadow: 0 0 0 3.5px #6FAF9622;
 }
 input[type="range"]::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #fff;
-  border: 3px solid #719CAF;
-  box-shadow: 0 0 10px #719CAF55;
+  border: 2px solid #719CAF;
+  box-shadow: 0 0 7px #719CAF55;
 }
 input[type="range"]:focus::-moz-range-thumb {
-  box-shadow: 0 0 0 5px #6FAF9622;
+  box-shadow: 0 0 0 3.5px #6FAF9622;
 }
 input[type="range"]::-ms-thumb {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #fff;
-  border: 3px solid #719CAF;
-  box-shadow: 0 0 10px #719CAF55;
+  border: 2px solid #719CAF;
+  box-shadow: 0 0 7px #719CAF55;
 }
 input[type="range"]:focus::-ms-thumb {
-  box-shadow: 0 0 0 5px #6FAF9622;
+  box-shadow: 0 0 0 3.5px #6FAF9622;
 }
 input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
@@ -221,8 +220,8 @@ input[type="range"]:focus {
   border: none;
   outline: none;
   border-radius: 0.9rem;
-  padding: 0.38rem 1.3rem 0.38rem 1.2rem;
-  font-size: 1.22rem;
+  padding: 0.28rem 1.00rem 0.28rem 0.92rem; /* avant : 0.38rem 1.3rem 0.38rem 1.2rem */
+  font-size: 0.92rem; /* avant : 1.22rem */
   font-family: 'Inter', monospace, Arial, sans-serif;
   font-weight: 400;
   box-shadow: 0 3px 18px #1116, 0 0 0 2px #719CAF66;
@@ -231,7 +230,7 @@ input[type="range"]:focus {
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
-  min-width: 94px;
+  min-width: 72px; /* avant : 94px */
 }
 .select-glass:focus {
   box-shadow: 0 2px 16px #719CAFcc, 0 0 0 2.5px #719CAFbb;
@@ -243,7 +242,7 @@ input[type="range"]:focus {
   color: #fff;
   font-weight: 500;
   border-radius: 0.9rem;
-  padding: 0.38rem 1.3rem;
+  padding: 0.28rem 1.00rem;
 }
 .select-glass::-ms-expand { display: none; }
 .select-glass::-webkit-select-placeholder { color: #fff; opacity: 0.7; }
@@ -251,11 +250,11 @@ input[type="range"]:focus {
 
 /* === RESPONSIVE TITRES/BOUTONS === */
 @media (max-width: 900px) {
-  .year-big { font-size: 2.7rem; }
-  .title-glow { font-size: 1.25rem; }
-  .region-btn { font-size: 0.86rem; padding: 0.22rem 0.6rem; }
-  .graph-btn { font-size: 1.05rem; padding: 0.30rem 0.75rem; }
-  .select-glass { font-size: 1.03rem; min-width: 76px; }
+  .year-big { font-size: 2.1rem; }    /* avant : 2.7rem */
+  .title-glow { font-size: 0.96rem; } /* avant : 1.25rem */
+  .region-btn { font-size: 0.69rem; padding: 0.15rem 0.48rem; } /* avant : 0.86rem, 0.22rem 0.6rem */
+  .graph-btn { font-size: 0.84rem; padding: 0.23rem 0.56rem; }  /* avant : 1.05rem, 0.30rem 0.75rem */
+  .select-glass { font-size: 0.77rem; min-width: 60px; }        /* avant : 1.03rem, 76px */
 }
 
 /* === ANIMATIONS FADE === */
