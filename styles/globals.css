@@ -145,28 +145,58 @@ html, body {
   outline-offset: 2px;
 }
 
-/* === SLIDER MODERNE GLASS === */
+/* === SLIDER MODERNE GLASS (GRADIENT JUSQU'AU CURSEUR) === */
 input[type="range"] {
-  accent-color: #719CAF;
-  height: 4px;
-  background: linear-gradient(90deg, #719CAF99 0%, #6FAF96cc 100%);
-  border-radius: 8px;
+  accent-color: unset;
+  height: 20px;
+  background: transparent;
+  margin: 0;
+  padding: 0;
   outline: none;
-  transition: box-shadow 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+  --progress: 0%;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 8px;
+  background: 
+    linear-gradient(90deg, #719CAF99 0%, #6FAF96cc 100%) 0/var(--progress) 100% no-repeat,
+    rgba(255,255,255,0.06);
+}
+input[type="range"]:focus::-webkit-slider-runnable-track {
+  background: 
+    linear-gradient(90deg, #6FAF96cc 0%, #719CAF99 100%) 0/var(--progress) 100% no-repeat,
+    rgba(255,255,255,0.06);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px; /* avant : 18px */
-  height: 14px; /* avant : 18px */
+  margin-top: -5px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #fff;
-  border: 2px solid #719CAF; /* avant : 3px */
+  border: 2px solid #71af89;
   box-shadow: 0 0 7px #719CAF55;
   transition: box-shadow 0.2s;
 }
 input[type="range"]:focus::-webkit-slider-thumb {
   box-shadow: 0 0 0 3.5px #6FAF9622;
+}
+
+/* Firefox */
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 8px;
+  background: 
+    linear-gradient(90deg, #719CAF99 0%, #6FAF96cc 100%) 0/var(--progress) 100% no-repeat,
+    rgba(255,255,255,0.06);
+}
+input[type="range"]:focus::-moz-range-track {
+  background: 
+    linear-gradient(90deg, #6FAF96cc 0%, #719CAF99 100%) 0/var(--progress) 100% no-repeat,
+    rgba(255,255,255,0.06);
 }
 input[type="range"]::-moz-range-thumb {
   width: 14px;
@@ -179,23 +209,22 @@ input[type="range"]::-moz-range-thumb {
 input[type="range"]:focus::-moz-range-thumb {
   box-shadow: 0 0 0 3.5px #6FAF9622;
 }
-input[type="range"]::-ms-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid #719CAF;
-  box-shadow: 0 0 7px #719CAF55;
+/* Hide the default progress bar for Firefox */
+input[type="range"]::-moz-range-progress {
+  background: transparent; 
 }
-input[type="range"]:focus::-ms-thumb {
-  box-shadow: 0 0 0 3.5px #6FAF9622;
-}
-input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
+/* IE/Edge */
+input[type="range"]::-ms-fill-lower {
+  background: linear-gradient(90deg, #719CAF99 0%, #6FAF96cc 100%);
   border-radius: 8px;
 }
-input[type="range"]:focus {
-  outline: none;
+input[type="range"]::-ms-fill-upper {
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+}
+/* Pour éviter d'avoir des zones transparentes moches autour sur Firefox */
+input[type="range"] {
+  background: transparent;
 }
 
 /* === GLASSMORPHISM POUR LES CARTES/BARRES/CONTAINERS === */

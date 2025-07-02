@@ -60,7 +60,24 @@ export default function AnimatedTreemapGDP({
 }: AnimatedTreemapGDPProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const sliderRef = useRef<HTMLInputElement | null>(null); // <--- AJOUT
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
+
+  // ---- SLIDER: mise à jour du gradient
+  useEffect(() => {
+    const el = sliderRef.current;
+    if (!el) return;
+    function setProgress() {
+      const value = Number(el.value);
+      const min = Number(el.min);
+      const max = Number(el.max);
+      const percent = ((value - min) / (max - min)) * 100;
+      el.style.setProperty("--progress", `${percent}%`);
+    }
+    setProgress();
+    el.addEventListener("input", setProgress);
+    return () => el.removeEventListener("input", setProgress);
+  }, [years, animValue]); // Dépend de years au cas où le min/max change
 
   // Responsive
   useEffect(() => {
@@ -581,22 +598,30 @@ export default function AnimatedTreemapGDP({
         ))}
       </div>
 
-      {/* Contrôles animation alignés */}
+      {/* Contrôles animation alignés - MODIFIÉS */}
       <div
-        className="center-controls-wrapper flex items-center gap-6 w-full"
-        style={{ minWidth: 300, maxWidth: 1280, margin: "0 auto" }}
+        className="center-controls-wrapper flex items-center gap-4 w-full"
+        style={{
+          minWidth: 300,
+          maxWidth: 1280,
+          margin: "0 auto",
+          padding: "6px 0",
+          fontSize: 13,
+          lineHeight: "1.2",
+        }}
       >
         <div className="shrink-0 flex items-center">
           <PlayPauseButton
             playing={playing}
             onClick={handlePlayPause}
-            size={48}
+            size={34}
             disabled={years.length < 2}
           />
         </div>
         {/* Slider */}
-        <div className="flex-1 flex items-center justify-center min-w-[180px]">
+        <div className="flex-1 flex items-center justify-center min-w-[120px]">
           <input
+            ref={sliderRef}
             type="range"
             min={years[0]}
             max={years[years.length - 1]}
@@ -606,20 +631,20 @@ export default function AnimatedTreemapGDP({
               setPlaying(false);
               onYearChange(Math.round(Number(e.target.value)));
             }}
-            className="w-full h-2 bg-white/30 rounded-lg appearance-none cursor-pointer accent-blue-400"
-            style={{ minWidth: 120, maxWidth: 350 }}
+            className="w-full h-1.5 bg-white/30 rounded-lg accent-blue-400"
+            style={{ minWidth: 90, maxWidth: 250, height: 5 }}
           />
         </div>
         {/* Année */}
-        <div className="flex flex-col justify-center items-center min-w-[72px]">
+        <div className="flex flex-col justify-center items-center min-w-[60px]">
           <select
             value={roundedYear}
             onChange={(e) => {
               setPlaying(false);
               onYearChange(Number(e.target.value));
             }}
-            className="select-glass px-3 py-2 text-lg font-bold text-center"
-            style={{ minWidth: 64 }}
+            className="select-glass px-2 py-1 text-[1rem] font-semibold text-center"
+            style={{ minWidth: 48, fontSize: 15, padding: "3px 8px" }}
           >
             {years.map((y) => (
               <option key={y} value={y}>
@@ -628,17 +653,18 @@ export default function AnimatedTreemapGDP({
             ))}
           </select>
         </div>
-        {/* Focus Country select + Proportional selector à droite */}
+        {/* Focus Country + Proportional */}
         <div
-          className="flex flex-col justify-center items-center min-w-[180px] ml-2"
+          className="flex flex-col justify-center items-center min-w-[130px] ml-2"
           style={{ marginTop: 0 }}
         >
-          <div className="flex items-center gap-4 w-full justify-center">
+          <div className="flex items-center gap-5 w-full justify-center">
             <select
               id="countryFocus"
               value={countryFocus ?? ""}
               onChange={(e) => setCountryFocus(e.target.value || null)}
-              className="select-glass px-3 py-2 min-w-[100px] w-full"
+              className="select-glass px-2 py-1 min-w-[70px]"
+              style={{ fontSize: 14, padding: "2px 8px" }}
             >
               <option value="">Focused Country</option>
               {countryList.map((country) => (
@@ -650,8 +676,8 @@ export default function AnimatedTreemapGDP({
             {countryFocus && (
               <span
                 onClick={() => setCountryFocus(null)}
-                className="text-white text-sm cursor-pointer select-none"
-                style={{ padding: "3px 10px" }}
+                className="text-white text-xs cursor-pointer select-none"
+                style={{ padding: "1px 7px" }}
                 title="Clear"
               >
                 Clear
@@ -660,14 +686,17 @@ export default function AnimatedTreemapGDP({
             <select
               id="proportionalSelect"
               value={proportional ? "proportional" : "non-proportional"}
-              onChange={(e) =>
-                setProportional(e.target.value === "proportional")
-              }
-              className="select-glass px-3 py-2 min-w-[100px]"
+              onChange={(e) => setProportional(e.target.value === "proportional")}
+              className="select-glass px-2 py-1 min-w-[75px]"
+              style={{
+                fontSize: 13,
+                padding: "2px 8px",
+                marginLeft: 12,
+              }}
               title="Choose proportional sizing mode"
             >
               <option value="proportional">Proportional</option>
-              <option value="non-proportional">Non Proportional</option>
+              <option value="non-proportional">Non prop.</option>
             </select>
           </div>
         </div>
