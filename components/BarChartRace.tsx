@@ -5,7 +5,7 @@ import { REGION_LIST, regionColors } from "./Colors";
 import PlayPauseButton from "./PlayPauseButton";
 
 // Format espace pour les milliers
-function formatNumberSpace(num: number) {
+function formatNumberSpace(num) {
   if (typeof num !== "number" || isNaN(num)) return "";
   return num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
@@ -87,18 +87,25 @@ export default function BarChartRace({
   const width = containerSize.width;
   const height = containerSize.height;
 
-  // Région
+  // Région - logique AnimatedTreemap
   const regionListClean = REGION_LIST.filter(r => r !== "Other");
   const safeSelectedRegions =
     !selectedRegions || selectedRegions.length === 0
       ? regionListClean
       : selectedRegions.filter((r) => r !== "Other");
 
+  // --- Désoulignement : state d'animation local React
+  const [unselectingRegions, setUnselectingRegions] = useState<string[]>([]);
+
   function handleRegionToggle(region: string) {
     if (region === "Other") return;
     setSelectedRegions((current) => {
       if (!current || current === null) return [region];
       if (current.includes(region)) {
+        setUnselectingRegions((prev) => [...prev, region]);
+        setTimeout(() => {
+          setUnselectingRegions((prev) => prev.filter(r => r !== region));
+        }, 260);
         const next = current.filter((r) => r !== region);
         return next.length === 0 ? null : next;
       } else {
@@ -462,7 +469,7 @@ export default function BarChartRace({
         position: "relative",
       }}
     >
-      {/* Boutons région */}
+      {/* Boutons région style AnimatedTreemap */}
       <div className="flex flex-wrap gap-3 justify-center p-4 rounded-2xl">
         <button
           onClick={handleWorldClick}
@@ -472,6 +479,7 @@ export default function BarChartRace({
         </button>
         {regionListClean.map((region) => {
           const isActive = selectedArr.includes(region);
+          const isUnselecting = unselectingRegions.includes(region);
           return (
             <button
               key={region}
@@ -482,6 +490,7 @@ export default function BarChartRace({
               className={[
                 "region-btn",
                 isActive ? "region-btn--active" : "",
+                isUnselecting ? "unselecting" : ""
               ].join(" ")}
               style={
                 isActive
@@ -491,6 +500,7 @@ export default function BarChartRace({
                     }
                   : {}
               }
+              disabled={isUnselecting}
             >
               {region}
             </button>
