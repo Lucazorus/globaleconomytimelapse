@@ -49,13 +49,14 @@ export default function AnimatedTreemapGDP({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const sliderRef = useRef<HTMLInputElement | null>(null);
 
-  // Tooltip live
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  // Dummy state pour forcer le render quand on set le focus
+  const [focusRerender, setFocusRerender] = useState(0);
+
+  // Tooltip
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
 
-  // Pour le focus pending pendant l’animation
-  const [pendingCountry, setPendingCountry] = useState<string | null>(null);
-  const lastNodesRef = useRef<any[]>([]);
+  // Focus Country value à l’instant T
+  const [focusValue, setFocusValue] = useState<number | null>(null);
 
   // Responsive
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
@@ -148,22 +149,6 @@ export default function AnimatedTreemapGDP({
     return { name: "World", children: regionsArr };
   }
 
-  function mapTreemapNodes(root: any) {
-    const map = new Map<string, any>();
-    if (!root.leaves) return map;
-    root.leaves().forEach((d: any) => {
-      map.set((d.parent?.data.name ?? "") + "|" + d.data.name, {
-        x0: d.x0,
-        x1: d.x1,
-        y0: d.y0,
-        y1: d.y1,
-        value: d.value ?? 0,
-        region: d.data.region,
-      });
-    });
-    return map;
-  }
-
   function getFontSize(area: number, maxFont = 24, minFont = 5) {
     return Math.max(minFont, Math.min(maxFont, Math.sqrt(area) / 5));
   }
@@ -207,6 +192,12 @@ export default function AnimatedTreemapGDP({
     };
   }, [playing, years, onYearChange, setPlaying]);
 
+  // ----------- Country Focus handler qui force le render
+  function handleCountryFocus(country: string | null) {
+    setCountryFocus(country);
+    setFocusRerender(v => v + 1); // force re-render, donc état bien à jour
+  }
+
   function handleFreeForAllClick() {
     if (freeForAll) {
       setSelectedRegions(null);
@@ -249,7 +240,7 @@ export default function AnimatedTreemapGDP({
     if (wasPlaying) setTimeout(() => setPlaying(true), 0);
   }
 
-  // --- Core Treemap rendering & nodes pour le click/tooltip live
+  // --- Core Treemap rendering (rect events natifs)
   useEffect(() => {
     if (!svgRef.current || !Array.isArray(data) || data.length === 0 || years.length === 0) return;
     const y1 = Math.floor(animValue);
@@ -341,8 +332,14 @@ export default function AnimatedTreemapGDP({
       d.y1 += ((1 - k2) / 2) * height;
     });
 
-    const m1 = mapTreemapNodes(h1);
-    const m2 = mapTreemapNodes(h2);
+    const m1 = new Map<string, any>();
+    if (h1.leaves) h1.leaves().forEach((d: any) => {
+      m1.set((d.parent?.data.name ?? "") + "|" + d.data.name, d);
+    });
+    const m2 = new Map<string, any>();
+    if (h2.leaves) h2.leaves().forEach((d: any) => {
+      m2.set((d.parent?.data.name ?? "") + "|" + d.data.name, d);
+    });
 
     const leaves = Array.from(new Set([...m1.keys(), ...m2.keys()]));
     const nodes = leaves
@@ -356,20 +353,28 @@ export default function AnimatedTreemapGDP({
         const y1 = a && b ? (1 - t) * a.y1 + t * b.y1 : a ? a.y1 : b.y1;
         const value =
           a && b ? (1 - t) * a.value + t * b.value : a ? a.value : b.value;
-        const region = (a && a.region) || (b && b.region);
+        const region = (a && a.data.region) || (b && b.data.region);
         const [_, country] = key.split("|");
         return { x0, x1, y0, y1, value, region, country };
       })
       .filter(Boolean) as any[];
 
-    lastNodesRef.current = nodes;
+    // --- Focus Country GDP value live ---
+    if (countryFocus) {
+      const focusNode = nodes.find((d) => d.country === countryFocus);
+      setFocusValue(focusNode ? focusNode.value : null);
+    } else {
+      setFocusValue(null);
+    }
 
     // SVG rendering
     const svg = d3
       .select(svgRef.current)
       .attr("viewBox", `0 -30 ${width} ${height + 50}`)
       .attr("width", width)
-      .attr("height", height + 50);
+      .attr("height", height + 50)
+      .attr("key", countryFocus + "-" + focusRerender); // force rerender
+
     svg.selectAll("*").remove();
 
     svg
@@ -416,7 +421,24 @@ export default function AnimatedTreemapGDP({
           .attr("width", d.x1 - d.x0)
           .attr("height", d.y1 - d.y0)
           .attr("fill", isFocused ? "#FA003F" : regionColors(d.region))
-          .attr("cursor", "pointer");
+          .attr("cursor", "pointer")
+          .on("click", function (event: MouseEvent) {
+            handleCountryFocus(d.country);
+          })
+          .on("mousemove", function (event: MouseEvent) {
+            if (!playing) {
+              setTooltip({
+                show: true,
+                x: event.clientX,
+                y: event.clientY,
+                content: `<b>${d.country}</b><br>${formatValue(d.value)}`
+              });
+            }
+          })
+          .on("mouseleave", function () {
+            setTooltip((tt) => tt.show ? { ...tt, show: false } : tt);
+          });
+
         const area = (d.x1 - d.x0) * (d.y1 - d.y0);
         const maxFont = regionFontSizeMap[d.region] || 22;
         const fontSize = getFontSize(area, maxFont);
@@ -450,82 +472,28 @@ export default function AnimatedTreemapGDP({
           }
         }
       });
+  // Ajoute bien focusRerender dans la dépendance :
   }, [
     data,
     animValue,
     years,
     selectedRegions,
     countryFocus,
+    focusRerender,
     freeForAll,
     proportional,
     width,
     height,
+    setCountryFocus,
+    setPlaying,
+    formatValue,
+    playing, // Tooltip dépend de playing
   ]);
-
-  // --- Tooltip live, tracking survol
-  useEffect(() => {
-    if (!mousePos || !svgRef.current) {
-      setTooltip((tt) => tt.show ? { ...tt, show: false } : tt);
-      return;
-    }
-    const rect = svgRef.current.getBoundingClientRect();
-    const svgX = mousePos.x - rect.left;
-    const svgY = mousePos.y - rect.top;
-    const nodes = lastNodesRef.current;
-    const hoveredNode = nodes.find(
-      (d) =>
-        svgX >= d.x0 &&
-        svgX <= d.x1 &&
-        svgY >= d.y0 &&
-        svgY <= d.y1
-    );
-    if (hoveredNode) {
-      setTooltip({
-        show: true,
-        x: mousePos.x,
-        y: mousePos.y,
-        content: `<b>${hoveredNode.country}</b><br>${formatValue(hoveredNode.value)}`
-      });
-    } else {
-      setTooltip({ show: false, x: 0, y: 0, content: "" });
-    }
-  }, [mousePos, animValue, width, height]);
-
-  // --- Focus robustifié : applique le pending focus après anim
-  useEffect(() => {
-    if (!playing && pendingCountry) {
-      setCountryFocus(pendingCountry);
-      setPendingCountry(null);
-    }
-  }, [playing, pendingCountry, setCountryFocus]);
-
-  // --- Handler SVG global (click partout sur le graph)
-  function handleSvgClick(e: React.MouseEvent<SVGSVGElement, MouseEvent>) {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const svgX = e.clientX - rect.left;
-    const svgY = e.clientY - rect.top;
-    const nodes = lastNodesRef.current;
-    if (nodes) {
-      const hoveredNode = nodes.find(
-        (d) =>
-          svgX >= d.x0 &&
-          svgX <= d.x1 &&
-          svgY >= d.y0 &&
-          svgY <= d.y1
-      );
-      if (hoveredNode) {
-        setPlaying(false);      // Stoppe anim, le focus se fera dans useEffect au frame suivante
-        setPendingCountry(hoveredNode.country);
-      }
-    }
-  }
 
   // Contrôles etc. inchangés
   const selectedArr = Array.isArray(selectedRegions) ? selectedRegions : [];
   const [countryList, setCountryList] = useState<string[]>([]);
   useEffect(() => {
-    // Peut être optimisé, mais on garde la logique de ton code d’avant
     setCountryList(
       data
         .filter((d) => d.region && d.region !== "Other" && years.includes(d.year))
@@ -567,7 +535,7 @@ export default function AnimatedTreemapGDP({
       }}
     >
       {/* TOOLTIP */}
-      {tooltip.show && (
+      {tooltip.show && !playing && (
         <div
           style={{
             position: "fixed",
@@ -692,52 +660,86 @@ export default function AnimatedTreemapGDP({
             ))}
           </select>
         </div>
-        {/* Focus Country + Proportional */}
-        <div
-          className="flex flex-col justify-center items-center min-w-[130px] ml-2"
-          style={{ marginTop: 0 }}
-        >
-          <div className="flex items-center gap-5 w-full justify-center">
-            <select
-              id="countryFocus"
-              value={countryFocus ?? ""}
-              onChange={(e) => setCountryFocus(e.target.value || null)}
-              className="select-glass px-2 py-1 min-w-[70px]"
-              style={{ fontSize: 14, padding: "2px 8px" }}
-            >
-              <option value="">Focused Country</option>
-              {countryList.map((country) => (
-                <option key={country} value={country}>
-                  {country}
-                </option>
-              ))}
-            </select>
-            {countryFocus && (
-              <span
-                onClick={() => setCountryFocus(null)}
-                className="text-white text-xs cursor-pointer select-none"
-                style={{ padding: "1px 7px" }}
-                title="Clear"
-              >
-                Clear
-              </span>
-            )}
-            <select
-              id="proportionalSelect"
-              value={proportional ? "proportional" : "non-proportional"}
-              onChange={(e) => setProportional(e.target.value === "proportional")}
-              className="select-glass px-2 py-1 min-w-[75px]"
+        {/* Focus Country + PIB + Clear + Proportional */}
+        <div className="flex flex-row items-center min-w-[250px] ml-2" style={{ marginTop: 0 }}>
+          <select
+            id="countryFocus"
+            value={countryFocus ?? ""}
+            onChange={(e) => handleCountryFocus(e.target.value || null)}
+            className="select-glass px-2 py-1 min-w-[100px]"
+            style={{ fontSize: 14, padding: "2px 8px" }}
+          >
+            <option value="">Focused Country</option>
+            {countryList.map((country) => (
+              <option key={country} value={country}>
+                {country}
+              </option>
+            ))}
+          </select>
+          {countryFocus && (
+            <span
+              className="text-white text-xs select-none"
               style={{
-                fontSize: 13,
-                padding: "2px 8px",
-                marginLeft: 12,
+                padding: "1px 9px",
+                marginLeft: 7,
+                marginRight: 5,
+                fontSize: 15,
+                fontWeight: 500,
+                fontFamily: "Inter, Arial, sans-serif",
+                letterSpacing: "0.04em",
+                background: "rgba(255,255,255,0.09)",
+                borderRadius: 7,
+                minWidth: 80,
+                display: "inline-block",
+                textAlign: "center",
+                lineHeight: "1.25",
+                opacity: 0.93,
               }}
-              title="Choose proportional sizing mode"
+              title="GDP at this year"
             >
-              <option value="proportional">Proportional</option>
-              <option value="non-proportional">Non prop.</option>
-            </select>
-          </div>
+              {focusValue !== null ? formatValue(focusValue) : "—"}
+            </span>
+          )}
+          {countryFocus && (
+            <button
+              onClick={() => handleCountryFocus(null)}
+              className="ml-2 text-white text-sm cursor-pointer select-none inline-flex items-center"
+              style={{
+                color: "#fff",  
+                padding: "3px 12px",
+                borderRadius: 8,
+                border: "none",
+                background: "#f9013f",
+                marginLeft: 7,
+                marginRight: 3,
+                fontWeight: 400,
+                fontFamily: "Inter, Arial, sans-serif",
+                fontSize: 15,
+                lineHeight: "1.25",
+                transition: "background 0.18s",
+              }}
+              title="Clear"
+              onMouseOver={e => (e.currentTarget.style.background = "#f9013f")}
+              onMouseOut={e => (e.currentTarget.style.background = "#f9013f")}
+            >
+              Clear
+            </button>
+          )}
+          <select
+            id="proportionalSelect"
+            value={proportional ? "proportional" : "non-proportional"}
+            onChange={(e) => setProportional(e.target.value === "proportional")}
+            className="select-glass px-2 py-1 min-w-[75px]"
+            style={{
+              fontSize: 13,
+              padding: "2px 8px",
+              marginLeft: 12,
+            }}
+            title="Choose proportional sizing mode"
+          >
+            <option value="proportional">Proportional</option>
+            <option value="non-proportional">Non prop.</option>
+          </select>
         </div>
       </div>
 
@@ -750,9 +752,7 @@ export default function AnimatedTreemapGDP({
           ref={svgRef}
           width={width}
           height={height}
-          onMouseMove={e => setMousePos({ x: e.clientX, y: e.clientY })}
-          onMouseLeave={() => setMousePos(null)}
-          onClick={handleSvgClick}
+          key={countryFocus + "-" + focusRerender}
           style={{
             display: "block",
             minWidth: 360,

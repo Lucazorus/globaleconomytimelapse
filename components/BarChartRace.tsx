@@ -57,15 +57,14 @@ export default function BarChartRace({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const sliderRef = useRef<HTMLInputElement | null>(null);
 
-  // Responsive container (height: 100% of parent)
+  // Responsive container
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
-
   useEffect(() => {
     function handleResize() {
       if (!containerRef.current) return;
       const width = containerRef.current.offsetWidth || 1200;
       const totalHeight = containerRef.current.offsetHeight || 600;
-      const controlsHeight = 185; // ajuste selon ton layout
+      const controlsHeight = 185;
       const height = Math.max(
         320,
         totalHeight - controlsHeight,
@@ -85,14 +84,10 @@ export default function BarChartRace({
       window.removeEventListener("resize", handleResize);
     };
   }, []);
-
   const width = containerSize.width;
   const height = containerSize.height;
 
-  // --- unselectingRegions state (désoulignement animé)
-  const [unselectingRegions, setUnselectingRegions] = useState<string[]>([]);
-
-  // --- Gestion boutons région (copié du Treemap)
+  // Région
   const regionListClean = REGION_LIST.filter(r => r !== "Other");
   const safeSelectedRegions =
     !selectedRegions || selectedRegions.length === 0
@@ -104,10 +99,6 @@ export default function BarChartRace({
     setSelectedRegions((current) => {
       if (!current || current === null) return [region];
       if (current.includes(region)) {
-        setUnselectingRegions((prev) => [...prev, region]);
-        setTimeout(() => {
-          setUnselectingRegions((prev) => prev.filter(r => r !== region));
-        }, 350);
         const next = current.filter((r) => r !== region);
         return next.length === 0 ? null : next;
       } else {
@@ -127,193 +118,11 @@ export default function BarChartRace({
     setSelectedRegions(null);
   }
 
-  // Slider style: animation du gradient, identique au Treemap
-  useEffect(() => {
-    const el = sliderRef.current;
-    if (!el) return;
-    function setProgress() {
-      const value = Number(el.value);
-      const min = Number(el.min);
-      const max = Number(el.max);
-      const percent = ((value - min) / (max - min)) * 100;
-      el.style.setProperty("--progress", `${percent}%`);
-    }
-    setProgress();
-    el.addEventListener("input", setProgress);
-    return () => el.removeEventListener("input", setProgress);
-  }, [years, animValue]);
-
-  // Animation (barres)
+  // Animation (autoplay)
   const playingRef = useRef(playing);
   const yearRef = useRef(year);
   useEffect(() => { playingRef.current = playing; }, [playing]);
   useEffect(() => { yearRef.current = year; }, [year]);
-
-  function createKeyframes(
-    data: CountryData[],
-    years: number[],
-    regions: string[] = regionListClean
-  ): [number, CountryData[], number][] {
-    return years.map((year) => {
-      let yearData = data.filter(
-        (d) =>
-          d.year === year &&
-          d.gdp > 0 &&
-          d.region && d.region !== "Other" &&
-          regions.includes(d.region)
-      );
-      const sorted = yearData
-        .sort((a, b) => b.gdp - a.gdp)
-        .slice(0, topN)
-        .map((d, i) => ({ ...d, rank: i }));
-      const maxValue = Math.max(0, ...sorted.map((d) => d.gdp));
-      return [year, sorted, maxValue];
-    });
-  }
-
-  // --- Tooltip: on ne garde que la position de la souris ---
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
-  function useTooltip() {
-    const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
-    function showTooltip(x: number, y: number, content: string) { setTooltip({ show: true, x, y, content }); }
-    function hideTooltip() { setTooltip({ show: false, x: 0, y: 0, content: "" }); }
-    return { tooltip, showTooltip, hideTooltip, setTooltip };
-  }
-  const { tooltip, setTooltip } = useTooltip();
-
-  // LABELS logic
-  const labels = (svg: any) => {
-    const x = d3.scaleLinear().range([margin.left, width - margin.right]);
-    const y = (_d: any, i: number) => margin.top + i * (barHeight + barPadding);
-    return (keyframe: any, transition: any) => {
-      const [_, data, maxValue] = keyframe;
-      x.domain([0, maxValue * 1.08]);
-      svg.selectAll("text.country-label").remove();
-      svg.selectAll("text.value-label").remove();
-
-      data.forEach((d: any, i: number) => {
-        const barLen = x(d.gdp) - margin.left;
-        let countryX, valueX, anchor;
-        let showOutside = barLen < MIN_BAR_LABEL_WIDTH;
-        if (!showOutside) {
-          countryX = x(d.gdp) - 14;
-          valueX = x(d.gdp) + 18;
-          anchor = "end";
-        } else {
-          countryX = x(d.gdp) + 8;
-          valueX = x(d.gdp) + 24 + d.country.length * 10;
-          anchor = "start";
-        }
-        svg.append("text")
-          .attr("class", "country-label")
-          .attr("x", countryX)
-          .attr("y", y(d, i) + barHeight / 2 + 4)
-          .attr("font-size", 15)
-          .attr("fill", "#fff")
-          .attr("font-family", "Inter, Arial, sans-serif")
-          .attr("font-weight", 300)
-          .attr("letter-spacing", "0.06em")
-          .attr("text-anchor", anchor)
-          .attr("cursor", "pointer")
-          .attr("text-transform", "uppercase")
-          .text(
-            d.country.length < 20
-              ? d.country.toUpperCase()
-              : d.country.slice(0, 19).toUpperCase() + "…"
-          )
-          .on("click", () => setCountryFocus(d.country));
-        let valueLabel = isPerCapita
-          ? `$${formatNumberSpace(d.gdp)}`
-          : `$${formatNumberSpace(Math.round(d.gdp / 1e6) / 1e3)}B`;
-        svg.append("text")
-          .attr("class", "value-label")
-          .attr("x", valueX)
-          .attr("y", y(d, i) + barHeight / 2 + 4)
-          .attr("font-size", 17)
-          .attr("fill", "#fff")
-          .attr("opacity", 0.95)
-          .attr("font-family", "Inter, Arial, sans-serif")
-          .attr("font-weight", 300)
-          .attr("letter-spacing", "0.04em")
-          .attr("text-anchor", "start")
-          .attr("text-transform", "uppercase")
-          .attr("cursor", "pointer")
-          .text(valueLabel)
-          .on("click", () => setCountryFocus(d.country));
-      });
-    };
-  };
-
-  // BARS logic
-  const bars = (svg: any) => {
-    const x = d3.scaleLinear().range([margin.left, width - margin.right]);
-    const y = (_d: any, i: number) => margin.top + i * (barHeight + barPadding);
-    return (keyframe: any, transition: any) => {
-      const [_, data, maxValue] = keyframe;
-      x.domain([0, maxValue * 1.08]);
-      const bar = svg
-        .selectAll("g.bar")
-        .data(data, (d: any) => d.country)
-        .join(
-          (enter: any) => {
-            const g = enter.append("g").attr("class", "bar");
-            g.attr("transform", (_d: any, i: number) => `translate(0,${y(_d, i)})`);
-            g.append("rect")
-              .attr("x", margin.left)
-              .attr("y", 0)
-              .attr("height", barHeight)
-              .attr("width", (d: any) => x(d.gdp) - margin.left)
-              .attr("fill", (d: any) =>
-                countryFocus && d.country === countryFocus
-                  ? "#FA003F"
-                  : regionColors(d.region)
-              )
-              .attr("rx", 2)
-              .attr("cursor", "pointer")
-              .on("click", (_e: any, d: any) => setCountryFocus(d.country));
-            // --- NE METS PLUS de .on("mousemove") ici, gestion globale par SVG ---
-            return g;
-          },
-          (update: any) => {
-            update.attr("transform", (_d: any, i: number) => `translate(0,${y(_d, i)})`);
-            update
-              .select("rect")
-              .attr("fill", (d: any) =>
-                countryFocus && d.country === countryFocus
-                  ? "#FA003F"
-                  : regionColors(d.region)
-              );
-            return update;
-          },
-          (exit: any) => exit.remove()
-        );
-      if (transition) {
-        bar
-          .transition(transition)
-          .attr("transform", (_d: any, i: number) => `translate(0,${y(_d, i)})`);
-        bar
-          .select("rect")
-          .transition(transition)
-          .attr("width", (d: any) => x(d.gdp) - margin.left)
-          .attr("fill", (d: any) =>
-            countryFocus && d.country === countryFocus
-              ? "#FA003F"
-              : regionColors(d.region)
-          );
-      } else {
-        bar
-          .select("rect")
-          .attr("width", (d: any) => x(d.gdp) - margin.left)
-          .attr("fill", (d: any) =>
-            countryFocus && d.country === countryFocus
-              ? "#FA003F"
-              : regionColors(d.region)
-          );
-      }
-    };
-  };
-
-  // Animation (barres)
   useEffect(() => {
     if (!playing || !year || data.length === 0 || years.length === 0) return;
     let animating = true;
@@ -342,24 +151,44 @@ export default function BarChartRace({
     };
   }, [playing, year, years, data, onYearChange, setPlaying]);
 
-  // RENDER + TOOLTIP toujours à jour et “live” (même quand les barres changent d’ordre)
+  // Tooltip
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
+
+  // Focus GDP à afficher (synchronisé à chaque render)
+  const [focusGDP, setFocusGDP] = useState<string>("");
+
+  // ------- D3 render main -------
   useEffect(() => {
     if (!svgRef.current || data.length === 0 || years.length === 0) return;
 
+    // --- Interpolation bar chart ---
     const yearFloat = animValue;
     const y1 = Math.floor(yearFloat);
     const y2 = Math.ceil(yearFloat);
-    const t = yearFloat - y1;
-
+    const t = animValue - y1;
     const y1Clamped = Math.max(years[0], Math.min(years[years.length - 1], y1));
     const y2Clamped = Math.max(years[0], Math.min(years[years.length - 1], y2));
-
     const regionsArray = safeSelectedRegions;
 
-    const kf1 = createKeyframes(data, [y1Clamped], regionsArray)[0] as [number, CountryData[], number];
-    const kf2 = createKeyframes(data, [y2Clamped], regionsArray)[0] as [number, CountryData[], number];
+    function createKeyframe(yearVal: number) {
+      let yearData = data.filter(
+        (d) =>
+          d.year === yearVal &&
+          d.gdp > 0 &&
+          d.region && d.region !== "Other" &&
+          regionsArray.includes(d.region)
+      );
+      const sorted = yearData
+        .sort((a, b) => b.gdp - a.gdp)
+        .slice(0, topN)
+        .map((d, i) => ({ ...d, rank: i }));
+      const maxValue = Math.max(0, ...sorted.map((d) => d.gdp));
+      return [yearVal, sorted, maxValue] as [number, CountryData[], number];
+    }
+    const kf1 = createKeyframe(y1Clamped);
+    const kf2 = createKeyframe(y2Clamped);
 
-    // Interpolation pays par pays
     const mergedCountries = new Map<string, any>();
     if (kf1 && Array.isArray(kf1[1])) for (const d of kf1[1]) mergedCountries.set(d.country, { ...d, gdp1: d.gdp, gdp2: 0 });
     if (kf2 && Array.isArray(kf2[1])) for (const d of kf2[1]) {
@@ -368,16 +197,66 @@ export default function BarChartRace({
       else
         mergedCountries.set(d.country, { ...d, gdp1: 0, gdp2: d.gdp });
     }
-
-    const interpData = Array.from(mergedCountries.values())
+    const interpTop = Array.from(mergedCountries.values())
       .map((d) => ({ ...d, gdp: d.gdp1 * (1 - t) + d.gdp2 * t }))
       .filter((d) => d.gdp > 0)
-      .sort((a, b) => b.gdp - a.gdp);
+      .sort((a, b) => b.gdp - a.gdp)
+      .slice(0, topN);
 
-    const interpTop = interpData.slice(0, topN);
+    // GDP du pays focus à afficher (live) — même s’il n’est pas dans le topN
+    if (countryFocus) {
+      const focus = interpTop.find(d => d.country === countryFocus);
+      if (focus) {
+        setFocusGDP(
+          isPerCapita
+            ? `$${formatNumberSpace(focus.gdp)}`
+            : `$${formatNumberSpace(Math.round(focus.gdp / 1e9))}B`
+        );
+      } else {
+        // Cherche le GDP dans toute la donnée pour l’année actuelle (interpolé)
+        const d1 = data.find(
+          d =>
+            d.country === countryFocus &&
+            d.year === y1 &&
+            d.gdp > 0 &&
+            d.region &&
+            d.region !== "Other"
+        );
+        const d2 = data.find(
+          d =>
+            d.country === countryFocus &&
+            d.year === y2 &&
+            d.gdp > 0 &&
+            d.region &&
+            d.region !== "Other"
+        );
+        let gdpInterp = null;
+        if (d1 && d2) {
+          gdpInterp = d1.gdp * (1 - t) + d2.gdp * t;
+        } else if (d1) {
+          gdpInterp = d1.gdp;
+        } else if (d2) {
+          gdpInterp = d2.gdp;
+        }
+        if (gdpInterp) {
+          setFocusGDP(
+            isPerCapita
+              ? `$${formatNumberSpace(gdpInterp)}`
+              : `$${formatNumberSpace(Math.round(gdpInterp / 1e9))}B`
+          );
+        } else {
+          setFocusGDP("—");
+        }
+      }
+    } else {
+      setFocusGDP("");
+    }
+
+    // ----- RENDER D3 -----
     const interpMax = Math.max(...interpTop.map((d) => d.gdp), 1);
-    const interpYear = y1Clamped * (1 - t) + y2Clamped * t;
-
+    const x = d3.scaleLinear().range([margin.left, width - margin.right]);
+    const y = (_d: any, i: number) => margin.top + i * (barHeight + barPadding);
+    x.domain([0, interpMax * 1.08]);
     const svg = d3
       .select(svgRef.current)
       .attr("viewBox", `0 0 ${width} ${height}`)
@@ -385,15 +264,107 @@ export default function BarChartRace({
       .attr("height", height);
     svg.selectAll("*").remove();
 
-    // Bars et labels
-    bars(svg)([interpYear, interpTop, interpMax], null);
-    labels(svg)([interpYear, interpTop, interpMax], null);
+    // Bars
+    svg
+      .selectAll("g.bar")
+      .data(interpTop, (d: any) => d.country)
+      .join(
+        (enter: any) => {
+          const g = enter.append("g").attr("class", "bar");
+          g.attr("transform", (_d: any, i: number) => `translate(0,${y(_d, i)})`);
+          g.append("rect")
+            .attr("x", margin.left)
+            .attr("y", 0)
+            .attr("height", barHeight)
+            .attr("width", (d: any) => x(d.gdp) - margin.left)
+            .attr("fill", (d: any) =>
+              countryFocus && d.country === countryFocus
+                ? "#FA003F"
+                : regionColors(d.region)
+            )
+            .attr("rx", 2)
+            .attr("cursor", "pointer")
+            .on("click", (_e: any, d: any) => setCountryFocus(d.country));
+          return g;
+        },
+        (update: any) => {
+          update.attr("transform", (_d: any, i: number) => `translate(0,${y(_d, i)})`);
+          update
+            .select("rect")
+            .attr("fill", (d: any) =>
+              countryFocus && d.country === countryFocus
+                ? "#FA003F"
+                : regionColors(d.region)
+            )
+            .on("click", (_e: any, d: any) => setCountryFocus(d.country));
+          return update;
+        },
+        (exit: any) => exit.remove()
+      )
+      .select("rect")
+      .attr("width", (d: any) => x(d.gdp) - margin.left)
+      .attr("fill", (d: any) =>
+        countryFocus && d.country === countryFocus
+          ? "#FA003F"
+          : regionColors(d.region)
+      )
+      .on("click", (_e: any, d: any) => setCountryFocus(d.country));
 
-    // Axe X formaté
-    const x = d3.scaleLinear()
-      .range([margin.left, width - margin.right])
-      .domain([0, interpMax * 1.08]);
+    // Labels
+    svg.selectAll("text.country-label").remove();
+    svg.selectAll("text.value-label").remove();
+    interpTop.forEach((d: any, i: number) => {
+      const barLen = x(d.gdp) - margin.left;
+      let countryX, valueX, anchor;
+      let showOutside = barLen < MIN_BAR_LABEL_WIDTH;
+      if (!showOutside) {
+        countryX = x(d.gdp) - 14;
+        valueX = x(d.gdp) + 18;
+        anchor = "end";
+      } else {
+        countryX = x(d.gdp) + 8;
+        valueX = x(d.gdp) + 24 + d.country.length * 10;
+        anchor = "start";
+      }
+      svg.append("text")
+        .attr("class", "country-label")
+        .attr("x", countryX)
+        .attr("y", y(d, i) + barHeight / 2 + 4)
+        .attr("font-size", 15)
+        .attr("fill", "#fff")
+        .attr("font-family", "Inter, Arial, sans-serif")
+        .attr("font-weight", 300)
+        .attr("letter-spacing", "0.06em")
+        .attr("text-anchor", anchor)
+        .attr("cursor", "pointer")
+        .attr("text-transform", "uppercase")
+        .text(
+          d.country.length < 20
+            ? d.country.toUpperCase()
+            : d.country.slice(0, 19).toUpperCase() + "…"
+        )
+        .on("click", () => setCountryFocus(d.country));
+      let valueLabel = isPerCapita
+        ? `$${formatNumberSpace(d.gdp)}`
+        : `$${formatNumberSpace(Math.round(d.gdp / 1e9))}B`;
+      svg.append("text")
+        .attr("class", "value-label")
+        .attr("x", valueX)
+        .attr("y", y(d, i) + barHeight / 2 + 4)
+        .attr("font-size", 17)
+        .attr("fill", "#fff")
+        .attr("opacity", 0.95)
+        .attr("font-family", "Inter, Arial, sans-serif")
+        .attr("font-weight", 300)
+        .attr("letter-spacing", "0.04em")
+        .attr("text-anchor", "start")
+        .attr("text-transform", "uppercase")
+        .attr("cursor", "pointer")
+        .text(valueLabel)
+        .on("click", () => setCountryFocus(d.country));
+    });
 
+    // Axe X
     svg.append("g")
       .attr("class", "x-axis")
       .attr("transform", `translate(0,${margin.top - 10})`)
@@ -402,7 +373,7 @@ export default function BarChartRace({
           .ticks(5)
           .tickFormat(d => isPerCapita
             ? `$${formatNumberSpace(Number(d))}`
-            : `$${formatNumberSpace(Math.round(Number(d) / 1e6) / 1e3)}B`
+            : `$${formatNumberSpace(Math.round(Number(d) / 1e9))}B`
           )
       )
       .selectAll("text")
@@ -410,8 +381,8 @@ export default function BarChartRace({
       .attr("fill", "#fff")
       .attr("font-family", "Inter, sans-serif");
 
-    // --- Tooltip live : calcule dynamiquement le pays sous la souris
-    if (mousePos && svgRef.current) {
+    // Tooltip live (affichage)
+    if (!playing && mousePos && svgRef.current) {
       const svgRect = svgRef.current.getBoundingClientRect();
       const mouseY = mousePos.y - svgRect.top;
       const i = Math.floor((mouseY - margin.top) / (barHeight + barPadding));
@@ -419,7 +390,7 @@ export default function BarChartRace({
         const d = interpTop[i];
         let valueLabel = isPerCapita
           ? `$${formatNumberSpace(d.gdp)}`
-          : `$${formatNumberSpace(Math.round(d.gdp / 1e6) / 1e3)}B`;
+          : `$${formatNumberSpace(Math.round(d.gdp / 1e9))}B`;
         setTooltip({
           show: true,
           x: mousePos.x + 20,
@@ -432,7 +403,6 @@ export default function BarChartRace({
     } else {
       setTooltip({ show: false, x: 0, y: 0, content: "" });
     }
-
   }, [
     animValue,
     mousePos,
@@ -443,7 +413,7 @@ export default function BarChartRace({
     isPerCapita,
     width,
     height,
-    setTooltip,
+    playing,
   ]);
 
   function handlePlayPause() {
@@ -492,7 +462,7 @@ export default function BarChartRace({
         position: "relative",
       }}
     >
-      {/* Boutons région avec anim désoulignement */}
+      {/* Boutons région */}
       <div className="flex flex-wrap gap-3 justify-center p-4 rounded-2xl">
         <button
           onClick={handleWorldClick}
@@ -502,7 +472,6 @@ export default function BarChartRace({
         </button>
         {regionListClean.map((region) => {
           const isActive = selectedArr.includes(region);
-          const isUnselecting = unselectingRegions.includes(region);
           return (
             <button
               key={region}
@@ -513,7 +482,6 @@ export default function BarChartRace({
               className={[
                 "region-btn",
                 isActive ? "region-btn--active" : "",
-                isUnselecting ? "unselecting" : ""
               ].join(" ")}
               style={
                 isActive
@@ -523,7 +491,6 @@ export default function BarChartRace({
                     }
                   : {}
               }
-              disabled={isUnselecting}
             >
               {region}
             </button>
@@ -531,7 +498,7 @@ export default function BarChartRace({
         })}
       </div>
 
-      {/* Contrôles alignés (Play, slider, années, focus) - slider identique au Treemap */}
+      {/* Contrôles alignés */}
       <div
         className="center-controls-wrapper flex items-center gap-4 w-full"
         style={{
@@ -580,12 +547,13 @@ export default function BarChartRace({
             ))}
           </select>
         </div>
-        {/* Focus Country */}
-        <div className="flex-1 flex justify-end items-center min-w-[130px] ml-3">
+        {/* Focus Country + PIB + Clear (style TreeMap) */}
+        <div className="flex flex-row items-center min-w-[250px] ml-2" style={{ marginTop: 0 }}>
           <select
             value={countryFocus ?? ""}
             onChange={(e) => setCountryFocus(e.target.value || null)}
-            className="select-glass px-3 py-2 min-w-[100px]"
+            className="select-glass px-2 py-1 min-w-[100px]"
+            style={{ fontSize: 14, padding: "2px 8px" }}
           >
             <option value="">Focused Country</option>
             {countryList.map((country) => (
@@ -596,17 +564,56 @@ export default function BarChartRace({
           </select>
           {countryFocus && (
             <span
+              className="text-white text-xs select-none"
+              style={{
+                padding: "1px 9px",
+                marginLeft: 7,
+                marginRight: 5,
+                fontSize: 15,
+                fontWeight: 500,
+                fontFamily: "Inter, Arial, sans-serif",
+                letterSpacing: "0.04em",
+                background: "rgba(255,255,255,0.09)",
+                borderRadius: 7,
+                minWidth: 80,
+                display: "inline-block",
+                textAlign: "center",
+                lineHeight: "1.25",
+                opacity: 0.93,
+              }}
+              title="GDP at this year"
+            >
+              {focusGDP || "—"}
+            </span>
+          )}
+          {countryFocus && (
+            <button
               onClick={() => setCountryFocus(null)}
               className="ml-2 text-white text-sm cursor-pointer select-none inline-flex items-center"
-              style={{ padding: "3px 10px" }}
+              style={{
+                color: "#fff",  
+                padding: "3px 12px",
+                borderRadius: 8,
+                border: "none",
+                background: "#f9013f",
+                marginLeft: 7,
+                marginRight: 3,
+                fontWeight: 400,
+                fontFamily: "Inter, Arial, sans-serif",
+                fontSize: 15,
+                lineHeight: "1.25",
+                transition: "background 0.18s",
+              }}
               title="Clear"
+              onMouseOver={e => (e.currentTarget.style.background = "#f9013f")}
+              onMouseOut={e => (e.currentTarget.style.background = "#f9013f")}
             >
               Clear
-            </span>
+            </button>
           )}
         </div>
       </div>
-      {/* SVG qui prend toute la hauteur dispo */}
+      {/* SVG */}
       <div
         className="w-full overflow-x-auto"
         style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}
@@ -626,8 +633,8 @@ export default function BarChartRace({
           onMouseLeave={() => setMousePos(null)}
         ></svg>
       </div>
-      {/* Tooltip HTML (en dehors du SVG) */}
-      {tooltip.show && (
+      {/* Tooltip */}
+      {!playing && tooltip.show && (
         <div
           style={{
             position: "fixed",
