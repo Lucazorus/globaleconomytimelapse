@@ -5,27 +5,9 @@ import { REGION_LIST, regionColors } from "./Colors";
 import PlayPauseButton from "./PlayPauseButton";
 
 // Format espace pour les milliers
-function formatNumberSpace(n: number) {
+function formatNumberSpace(n) {
   if (typeof n !== "number" || isNaN(n)) return "";
   return n.toLocaleString("fr-FR").replace(/\u202f/g, " ");
-}
-
-interface AnimatedTreemapGDPProps {
-  data: { year: number; gdp: number; country: string; region: string }[];
-  years: number[];
-  animValue: number;
-  playing: boolean;
-  setPlaying: (b: boolean) => void;
-  onYearChange: (cb: any) => void;
-  countryFocus: string | null;
-  setCountryFocus: (c: string | null) => void;
-  selectedRegions: string[] | null;
-  setSelectedRegions: React.Dispatch<React.SetStateAction<string[] | null>>;
-  freeForAll: boolean;
-  setFreeForAll: (v: boolean) => void;
-  proportional: boolean;
-  setProportional: (v: boolean) => void;
-  mode: any;
 }
 
 export default function AnimatedTreemapGDP({
@@ -44,25 +26,22 @@ export default function AnimatedTreemapGDP({
   proportional,
   setProportional,
   mode,
-}: AnimatedTreemapGDPProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const sliderRef = useRef<HTMLInputElement | null>(null);
+}) {
+  const containerRef = useRef(null);
+  const svgRef = useRef(null);
+  const sliderRef = useRef(null);
 
-  // Dummy state pour forcer le render quand on set le focus
   const [focusRerender, setFocusRerender] = useState(0);
 
-  // Tooltip LIVE
-  const [tooltip, setTooltip] = useState<{
-    show: boolean;
-    x: number;
-    y: number;
-    name: string;
-    value: number | null;
-  }>({ show: false, x: 0, y: 0, name: "", value: null });
+  const [tooltip, setTooltip] = useState({
+    show: false,
+    x: 0,
+    y: 0,
+    name: "",
+    value: null,
+  });
 
-  // Focus Country value à l’instant T
-  const [focusValue, setFocusValue] = useState<number | null>(null);
+  const [focusValue, setFocusValue] = useState(null);
 
   // Responsive
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
@@ -84,7 +63,7 @@ export default function AnimatedTreemapGDP({
   }, []);
   const { width, height } = containerSize;
 
-  // ---- SLIDER: mise à jour du gradient
+  // Slider
   useEffect(() => {
     const el = sliderRef.current;
     if (!el) return;
@@ -100,16 +79,15 @@ export default function AnimatedTreemapGDP({
     return () => el.removeEventListener("input", setProgress);
   }, [years, animValue]);
 
-  // --- Désoulignement : state d'animation local React
-  const [unselectingRegions, setUnselectingRegions] = useState<string[]>([]);
+  const [unselectingRegions, setUnselectingRegions] = useState([]);
 
-  // --- Calcul safe du mode per capita
+  // Per capita
   const isPerCapita =
     Array.isArray(data) && data.length && d3.max(data, d => d.gdp) !== undefined
-      ? d3.max(data, d => d.gdp)! < 5_000_000
+      ? d3.max(data, d => d.gdp) < 5_000_000
       : false;
 
-  function formatValue(val: number) {
+  function formatValue(val) {
     if (isPerCapita) {
       return "$" + formatNumberSpace(Math.round(val));
     } else {
@@ -118,9 +96,9 @@ export default function AnimatedTreemapGDP({
   }
 
   function getHierarchy(
-    data: AnimatedTreemapGDPProps["data"],
-    year: number,
-    selectedRegions: string[],
+    data,
+    year,
+    selectedRegions,
     freeForAll = false
   ) {
     const regionsToShow = selectedRegions;
@@ -155,11 +133,11 @@ export default function AnimatedTreemapGDP({
     return { name: "World", children: regionsArr };
   }
 
-  function getFontSize(area: number, maxFont = 24, minFont = 5) {
+  // POLICE MINIMUM TRES PETITE
+  function getFontSize(area, maxFont = 24, minFont = 2) {
     return Math.max(minFont, Math.min(maxFont, Math.sqrt(area) / 5));
   }
 
-  // --- selectedRegions est TOUJOURS array, sinon tout sauf Other
   const safeSelectedRegions =
     !selectedRegions || selectedRegions.length === 0
       ? REGION_LIST.filter((r) => r !== "Other")
@@ -174,7 +152,7 @@ export default function AnimatedTreemapGDP({
     if (!playing || years.length === 0) return;
     let animating = true;
     const tick = () => {
-      onYearChange((prev: number) => {
+      onYearChange((prev) => {
         if (!playingRef.current || !animating) return prev;
         const idx = years.findIndex((y) => y >= Math.floor(prev));
         if (idx < years.length - 1) {
@@ -198,10 +176,9 @@ export default function AnimatedTreemapGDP({
     };
   }, [playing, years, onYearChange, setPlaying]);
 
-  // ----------- Country Focus handler qui force le render
-  function handleCountryFocus(country: string | null) {
+  function handleCountryFocus(country) {
     setCountryFocus(country);
-    setFocusRerender(v => v + 1); // force re-render, donc état bien à jour
+    setFocusRerender(v => v + 1);
   }
 
   function handleFreeForAllClick() {
@@ -216,8 +193,7 @@ export default function AnimatedTreemapGDP({
     }
     setFreeForAll(false);
   }
-  // ----------- REGION BUTTON UNSELECTING HACK REACT -----------
-  function handleRegionToggle(region: string) {
+  function handleRegionToggle(region) {
     if (region === "Other") return;
     const wasPlaying = playing;
     setSelectedRegions((current) => {
@@ -235,7 +211,7 @@ export default function AnimatedTreemapGDP({
     });
     if (wasPlaying) setTimeout(() => setPlaying(true), 0);
   }
-  function handleRegionClick(region: string) {
+  function handleRegionClick(region) {
     if (region === "Other") return;
     const wasPlaying = playing;
     setSelectedRegions((current) => {
@@ -246,7 +222,7 @@ export default function AnimatedTreemapGDP({
     if (wasPlaying) setTimeout(() => setPlaying(true), 0);
   }
 
-  // --- Core Treemap rendering (rect events natifs)
+  // Rendu D3
   useEffect(() => {
     if (!svgRef.current || !Array.isArray(data) || data.length === 0 || years.length === 0) return;
     const y1 = Math.floor(animValue);
@@ -305,45 +281,45 @@ export default function AnimatedTreemapGDP({
 
     const h1 = d3
       .hierarchy(getHierarchy(data, y1Clamped, regionsArray, freeForAll))
-      .sum((d: any) => d.value || 0)
+      .sum((d) => d.value || 0)
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
     const h2 = d3
       .hierarchy(getHierarchy(data, y2Clamped, regionsArray, freeForAll))
-      .sum((d: any) => d.value || 0)
+      .sum((d) => d.value || 0)
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
     d3
-      .treemap<any>()
+      .treemap()
       .size([width * k1, height * k1])
       .paddingInner(PADDING_INNER)
       .paddingOuter(PADDING_OUTER)
       .paddingTop((d) => (!freeForAll && d.height === 1 ? PADDING_TOP : 0))(h1);
     d3
-      .treemap<any>()
+      .treemap()
       .size([width * k2, height * k2])
       .paddingInner(PADDING_INNER)
       .paddingOuter(PADDING_OUTER)
       .paddingTop((d) => (!freeForAll && d.height === 1 ? PADDING_TOP : 0))(h2);
 
-    h1.each((d: any) => {
+    h1.each((d) => {
       d.x0 += ((1 - k1) / 2) * width;
       d.x1 += ((1 - k1) / 2) * width;
       d.y0 += ((1 - k1) / 2) * height;
       d.y1 += ((1 - k1) / 2) * height;
     });
-    h2.each((d: any) => {
+    h2.each((d) => {
       d.x0 += ((1 - k2) / 2) * width;
       d.x1 += ((1 - k2) / 2) * width;
       d.y0 += ((1 - k2) / 2) * height;
       d.y1 += ((1 - k2) / 2) * height;
     });
 
-    const m1 = new Map<string, any>();
-    if (h1.leaves) h1.leaves().forEach((d: any) => {
+    const m1 = new Map();
+    if (h1.leaves) h1.leaves().forEach((d) => {
       m1.set((d.parent?.data.name ?? "") + "|" + d.data.name, d);
     });
-    const m2 = new Map<string, any>();
-    if (h2.leaves) h2.leaves().forEach((d: any) => {
+    const m2 = new Map();
+    if (h2.leaves) h2.leaves().forEach((d) => {
       m2.set((d.parent?.data.name ?? "") + "|" + d.data.name, d);
     });
 
@@ -363,7 +339,7 @@ export default function AnimatedTreemapGDP({
         const [_, country] = key.split("|");
         return { x0, x1, y0, y1, value, region, country };
       })
-      .filter(Boolean) as any[];
+      .filter(Boolean);
 
     // --- Focus Country GDP value live ---
     if (countryFocus) {
@@ -379,7 +355,7 @@ export default function AnimatedTreemapGDP({
       .attr("viewBox", `0 -30 ${width} ${height + 50}`)
       .attr("width", width)
       .attr("height", height + 50)
-      .attr("key", countryFocus + "-" + focusRerender); // force rerender
+      .attr("key", countryFocus + "-" + focusRerender);
 
     svg.selectAll("*").remove();
 
@@ -393,7 +369,7 @@ export default function AnimatedTreemapGDP({
       .lower();
 
     const regionNodes = h1.children || [];
-    const regionLabelData = regionNodes.map((regionNode: any) => {
+    const regionLabelData = regionNodes.map((regionNode) => {
       const regionWidth = regionNode.x1 - regionNode.x0;
       const regionHeight = regionNode.y1 - regionNode.y0;
       const regionArea = regionWidth * regionHeight;
@@ -409,7 +385,7 @@ export default function AnimatedTreemapGDP({
         fontSize: getFontSize(regionArea),
       };
     });
-    const regionFontSizeMap: Record<string, number> = {};
+    const regionFontSizeMap = {};
     for (const r of regionLabelData) {
       regionFontSizeMap[r.name] = r.fontSize;
     }
@@ -417,10 +393,10 @@ export default function AnimatedTreemapGDP({
     const group = svg.append("g").attr("class", "treemap");
     group
       .selectAll("g")
-      .data(nodes, (d: any) => d.region + "|" + d.country)
+      .data(nodes, (d) => d.region + "|" + d.country)
       .join("g")
-      .attr("transform", (d: any) => `translate(${d.x0},${d.y0})`)
-      .each(function (d: any) {
+      .attr("transform", (d) => `translate(${d.x0},${d.y0})`)
+      .each(function (d) {
         const g = d3.select(this);
         const isFocused = countryFocus && d.country === countryFocus;
         g.append("rect")
@@ -428,10 +404,10 @@ export default function AnimatedTreemapGDP({
           .attr("height", d.y1 - d.y0)
           .attr("fill", isFocused ? "#FA003F" : regionColors(d.region))
           .attr("cursor", "pointer")
-          .on("click", function (event: MouseEvent) {
+          .on("click", function (event) {
             handleCountryFocus(d.country);
           })
-          .on("mousemove", function (event: MouseEvent) {
+          .on("mousemove", function (event) {
             setTooltip({
               show: true,
               x: event.clientX,
@@ -448,11 +424,12 @@ export default function AnimatedTreemapGDP({
         const maxFont = regionFontSizeMap[d.region] || 22;
         const fontSize = getFontSize(area, maxFont);
 
-        if (d.x1 - d.x0 > 55 && d.y1 - d.y0 > 34) {
+        // Police MINI pour labels pays
+        if (d.x1 - d.x0 > 30 && d.y1 - d.y0 > 15) {
           g.append("text")
-            .attr("x", 4)
-            .attr("y", fontSize + 2)
-            .attr("font-size", fontSize * 0.88)
+            .attr("x", 3)
+            .attr("y", fontSize + 1)
+            .attr("font-size", Math.max(3, fontSize * 0.85)) // <---- ici on autorise petit
             .attr("font-family", "Inter, Arial, sans-serif")
             .attr("fill", "#fff")
             .attr("font-weight", 300)
@@ -465,9 +442,9 @@ export default function AnimatedTreemapGDP({
             );
           if (d.value) {
             g.append("text")
-              .attr("x", 4)
+              .attr("x", 3)
               .attr("y", fontSize * 2 + 2)
-              .attr("font-size", Math.max(8, fontSize * 0.74))
+              .attr("font-size", Math.max(3, fontSize * 0.70)) // <--- pareil ici
               .attr("font-family", "Inter, Arial, sans-serif")
               .attr("fill", "#fff")
               .attr("font-weight", 300)
@@ -491,12 +468,12 @@ export default function AnimatedTreemapGDP({
     setCountryFocus,
     setPlaying,
     formatValue,
-    playing, // Tooltip dépend de playing
+    playing,
   ]);
 
-  // Contrôles etc. inchangés
+  // Contrôles
   const selectedArr = Array.isArray(selectedRegions) ? selectedRegions : [];
-  const [countryList, setCountryList] = useState<string[]>([]);
+  const [countryList, setCountryList] = useState([]);
   useEffect(() => {
     setCountryList(
       data
@@ -538,7 +515,7 @@ export default function AnimatedTreemapGDP({
         position: "relative",
       }}
     >
-      {/* TOOLTIP visible en permanence si on survole */}
+      {/* TOOLTIP */}
       {tooltip.show && (
         <div
           style={{
@@ -769,7 +746,6 @@ export default function AnimatedTreemapGDP({
           </select>
         </div>
       </div>
-
       {/* SVG */}
       <div
         className="w-full overflow-x-auto"
