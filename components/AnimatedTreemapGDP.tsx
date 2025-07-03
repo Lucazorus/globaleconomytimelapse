@@ -52,8 +52,14 @@ export default function AnimatedTreemapGDP({
   // Dummy state pour forcer le render quand on set le focus
   const [focusRerender, setFocusRerender] = useState(0);
 
-  // Tooltip
-  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
+  // Tooltip LIVE
+  const [tooltip, setTooltip] = useState<{
+    show: boolean;
+    x: number;
+    y: number;
+    name: string;
+    value: number | null;
+  }>({ show: false, x: 0, y: 0, name: "", value: null });
 
   // Focus Country value à l’instant T
   const [focusValue, setFocusValue] = useState<number | null>(null);
@@ -426,14 +432,13 @@ export default function AnimatedTreemapGDP({
             handleCountryFocus(d.country);
           })
           .on("mousemove", function (event: MouseEvent) {
-            if (!playing) {
-              setTooltip({
-                show: true,
-                x: event.clientX,
-                y: event.clientY,
-                content: `<b>${d.country}</b><br>${formatValue(d.value)}`
-              });
-            }
+            setTooltip({
+              show: true,
+              x: event.clientX,
+              y: event.clientY,
+              name: d.country,
+              value: d.value,
+            });
           })
           .on("mouseleave", function () {
             setTooltip((tt) => tt.show ? { ...tt, show: false } : tt);
@@ -472,7 +477,6 @@ export default function AnimatedTreemapGDP({
           }
         }
       });
-  // Ajoute bien focusRerender dans la dépendance :
   }, [
     data,
     animValue,
@@ -534,8 +538,8 @@ export default function AnimatedTreemapGDP({
         position: "relative",
       }}
     >
-      {/* TOOLTIP */}
-      {tooltip.show && !playing && (
+      {/* TOOLTIP visible en permanence si on survole */}
+      {tooltip.show && (
         <div
           style={{
             position: "fixed",
@@ -545,18 +549,41 @@ export default function AnimatedTreemapGDP({
             background: "rgba(22,28,40,0.97)",
             color: "#fff",
             borderRadius: 10,
-            padding: "9px 15px",
-            fontSize: 16,
-            fontFamily: "Inter, Arial, sans-serif",
-            fontWeight: 300,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
+            padding: "11px 18px",
             minWidth: 120,
             zIndex: 1001,
             boxShadow: "0 4px 24px #1116",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            fontFamily: "Inter, Arial, sans-serif",
           }}
-          dangerouslySetInnerHTML={{ __html: tooltip.content }}
-        />
+        >
+          <span
+            style={{
+              fontWeight: 400,
+              fontSize: 17,
+              textTransform: "uppercase",
+              letterSpacing: "0.01em",
+              marginBottom: 2,
+              lineHeight: 1.1,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {tooltip.name}
+          </span>
+          <span
+            style={{
+              fontWeight: 400,
+              fontSize: 15,
+              opacity: 0.93,
+              whiteSpace: "nowrap",
+              lineHeight: 1.18,
+            }}
+          >
+            {tooltip.value !== null ? formatValue(tooltip.value) : "—"}
+          </span>
+        </div>
       )}
 
       {/* Boutons multi/single sélection */}
