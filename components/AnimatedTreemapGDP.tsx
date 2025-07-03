@@ -4,25 +4,12 @@ import * as d3 from "d3";
 import { REGION_LIST, regionColors } from "./Colors";
 import PlayPauseButton from "./PlayPauseButton";
 
-// ---- TOOLTIP ----
-function useTooltip() {
-  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
-  function showTooltip(x: number, y: number, content: string) {
-    setTooltip({ show: true, x, y, content });
-  }
-  function hideTooltip() {
-    setTooltip((tt) => ({ ...tt, show: false }));
-  }
-  return { tooltip, showTooltip, hideTooltip };
-}
-
-// ---- FORMATAGE ----
+// Format espace pour les milliers
 function formatNumberSpace(n: number) {
   if (typeof n !== "number" || isNaN(n)) return "";
   return n.toLocaleString("fr-FR").replace(/\u202f/g, " ");
 }
 
-// Props typing
 interface AnimatedTreemapGDPProps {
   data: { year: number; gdp: number; country: string; region: string }[];
   years: number[];
@@ -60,8 +47,35 @@ export default function AnimatedTreemapGDP({
 }: AnimatedTreemapGDPProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const sliderRef = useRef<HTMLInputElement | null>(null); // <--- AJOUT
+  const sliderRef = useRef<HTMLInputElement | null>(null);
+
+  // Tooltip live
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
+
+  // Pour le focus pending pendant l’animation
+  const [pendingCountry, setPendingCountry] = useState<string | null>(null);
+  const lastNodesRef = useRef<any[]>([]);
+
+  // Responsive
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
+  useEffect(() => {
+    function handleResize() {
+      if (!containerRef.current) return;
+      const width = containerRef.current.offsetWidth || 1200;
+      const height = containerRef.current.clientHeight || 400;
+      setContainerSize({ width: Math.max(0, width), height: Math.max(0, height) });
+    }
+    handleResize();
+    const observer = new window.ResizeObserver(handleResize);
+    if (containerRef.current) observer.observe(containerRef.current);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+  const { width, height } = containerSize;
 
   // ---- SLIDER: mise à jour du gradient
   useEffect(() => {
@@ -77,33 +91,10 @@ export default function AnimatedTreemapGDP({
     setProgress();
     el.addEventListener("input", setProgress);
     return () => el.removeEventListener("input", setProgress);
-  }, [years, animValue]); // Dépend de years au cas où le min/max change
+  }, [years, animValue]);
 
-  // Responsive
-  useEffect(() => {
-    function handleResize() {
-      if (!containerRef.current) return;
-      const width = containerRef.current.offsetWidth || 1200;
-      const height = containerRef.current.clientHeight || 400;
-      setContainerSize({
-        width: Math.max(0, width),
-        height: Math.max(0, height),
-      });
-    }
-    handleResize();
-    const observer = new window.ResizeObserver(handleResize);
-    if (containerRef.current) observer.observe(containerRef.current);
-    window.addEventListener("resize", handleResize);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
-  const { width, height } = containerSize;
-  const { tooltip, showTooltip, hideTooltip } = useTooltip();
-  const [countryList, setCountryList] = useState<string[]>([]);
-  const [focusData, setFocusData] = useState<any>(null);
+  // --- Désoulignement : state d'animation local React
+  const [unselectingRegions, setUnselectingRegions] = useState<string[]>([]);
 
   // --- Calcul safe du mode per capita
   const isPerCapita =
@@ -228,6 +219,25 @@ export default function AnimatedTreemapGDP({
     }
     setFreeForAll(false);
   }
+  // ----------- REGION BUTTON UNSELECTING HACK REACT -----------
+  function handleRegionToggle(region: string) {
+    if (region === "Other") return;
+    const wasPlaying = playing;
+    setSelectedRegions((current) => {
+      if (!current || current === null) return [region];
+      if (current.includes(region)) {
+        setUnselectingRegions((prev) => [...prev, region]);
+        setTimeout(() => {
+          setUnselectingRegions((prev) => prev.filter(r => r !== region));
+        }, 260);
+        const next = current.filter((r) => r !== region);
+        return next.length === 0 ? null : next;
+      } else {
+        return [...current, region];
+      }
+    });
+    if (wasPlaying) setTimeout(() => setPlaying(true), 0);
+  }
   function handleRegionClick(region: string) {
     if (region === "Other") return;
     const wasPlaying = playing;
@@ -238,22 +248,8 @@ export default function AnimatedTreemapGDP({
     });
     if (wasPlaying) setTimeout(() => setPlaying(true), 0);
   }
-  function handleRegionToggle(region: string) {
-    if (region === "Other") return;
-    const wasPlaying = playing;
-    setSelectedRegions((current) => {
-      if (!current || current === null) return [region];
-      if (current.includes(region)) {
-        const next = current.filter((r) => r !== region);
-        return next.length === 0 ? null : next;
-      } else {
-        return [...current, region];
-      }
-    });
-    if (wasPlaying) setTimeout(() => setPlaying(true), 0);
-  }
 
-  // --- Core Treemap rendering
+  // --- Core Treemap rendering & nodes pour le click/tooltip live
   useEffect(() => {
     if (!svgRef.current || !Array.isArray(data) || data.length === 0 || years.length === 0) return;
     const y1 = Math.floor(animValue);
@@ -366,21 +362,9 @@ export default function AnimatedTreemapGDP({
       })
       .filter(Boolean) as any[];
 
-    setCountryList(
-      nodes
-        .map((n) => n.country)
-        .filter((v, i, arr) => arr.indexOf(v) === i)
-        .sort()
-    );
+    lastNodesRef.current = nodes;
 
-    if (countryFocus) {
-      const f = nodes.find((n) => n.country === countryFocus);
-      setFocusData(f);
-    } else {
-      setFocusData(null);
-    }
-
-    // Render SVG
+    // SVG rendering
     const svg = d3
       .select(svgRef.current)
       .attr("viewBox", `0 -30 ${width} ${height + 50}`)
@@ -432,21 +416,7 @@ export default function AnimatedTreemapGDP({
           .attr("width", d.x1 - d.x0)
           .attr("height", d.y1 - d.y0)
           .attr("fill", isFocused ? "#FA003F" : regionColors(d.region))
-          .attr("cursor", "pointer")
-          .on("click", function (event: MouseEvent, d: any) {
-            event.stopPropagation();
-            setPlaying(false);
-            setCountryFocus(d.country);
-          })
-          .on("mousemove", function (event: MouseEvent) {
-            showTooltip(
-              event.clientX,
-              event.clientY,
-              `<b>${d.country}</b><br>${formatValue(d.value)}`
-            );
-          })
-          .on("mouseleave", hideTooltip);
-
+          .attr("cursor", "pointer");
         const area = (d.x1 - d.x0) * (d.y1 - d.y0);
         const maxFont = regionFontSizeMap[d.region] || 22;
         const fontSize = getFontSize(area, maxFont);
@@ -492,14 +462,79 @@ export default function AnimatedTreemapGDP({
     height,
   ]);
 
+  // --- Tooltip live, tracking survol
   useEffect(() => {
-    if (typeof selectedRegions === "undefined") {
-      setSelectedRegions(null);
+    if (!mousePos || !svgRef.current) {
+      setTooltip((tt) => tt.show ? { ...tt, show: false } : tt);
+      return;
     }
-    // eslint-disable-next-line
-  }, []);
+    const rect = svgRef.current.getBoundingClientRect();
+    const svgX = mousePos.x - rect.left;
+    const svgY = mousePos.y - rect.top;
+    const nodes = lastNodesRef.current;
+    const hoveredNode = nodes.find(
+      (d) =>
+        svgX >= d.x0 &&
+        svgX <= d.x1 &&
+        svgY >= d.y0 &&
+        svgY <= d.y1
+    );
+    if (hoveredNode) {
+      setTooltip({
+        show: true,
+        x: mousePos.x,
+        y: mousePos.y,
+        content: `<b>${hoveredNode.country}</b><br>${formatValue(hoveredNode.value)}`
+      });
+    } else {
+      setTooltip({ show: false, x: 0, y: 0, content: "" });
+    }
+  }, [mousePos, animValue, width, height]);
 
+  // --- Focus robustifié : applique le pending focus après anim
+  useEffect(() => {
+    if (!playing && pendingCountry) {
+      setCountryFocus(pendingCountry);
+      setPendingCountry(null);
+    }
+  }, [playing, pendingCountry, setCountryFocus]);
+
+  // --- Handler SVG global (click partout sur le graph)
+  function handleSvgClick(e: React.MouseEvent<SVGSVGElement, MouseEvent>) {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const svgX = e.clientX - rect.left;
+    const svgY = e.clientY - rect.top;
+    const nodes = lastNodesRef.current;
+    if (nodes) {
+      const hoveredNode = nodes.find(
+        (d) =>
+          svgX >= d.x0 &&
+          svgX <= d.x1 &&
+          svgY >= d.y0 &&
+          svgY <= d.y1
+      );
+      if (hoveredNode) {
+        setPlaying(false);      // Stoppe anim, le focus se fera dans useEffect au frame suivante
+        setPendingCountry(hoveredNode.country);
+      }
+    }
+  }
+
+  // Contrôles etc. inchangés
   const selectedArr = Array.isArray(selectedRegions) ? selectedRegions : [];
+  const [countryList, setCountryList] = useState<string[]>([]);
+  useEffect(() => {
+    // Peut être optimisé, mais on garde la logique de ton code d’avant
+    setCountryList(
+      data
+        .filter((d) => d.region && d.region !== "Other" && years.includes(d.year))
+        .map((d) => d.country)
+        .filter((v, i, arr) => arr.indexOf(v) === i)
+        .sort()
+    );
+  }, [data, years]);
+
   const roundedYear = Math.round(animValue);
 
   function handlePlayPause() {
@@ -571,34 +606,38 @@ export default function AnimatedTreemapGDP({
         >
           🌍 World
         </button>
-        {REGION_LIST.filter((region) => region !== "Other").map((region) => (
-          <button
-            key={region}
-            onClick={() =>
-              selectedArr.includes(region)
-                ? handleRegionToggle(region)
-                : handleRegionClick(region)
-            }
-            className={`region-btn${
-              selectedArr.includes(region) ? " region-btn--active" : ""
-            }`}
-            style={
-              selectedArr.includes(region)
-                ? {
-                    background: `${regionColors(region)}22`,
-                    boxShadow: `0 0 0 3px ${regionColors(
-                      region
-                    )}80, 0 4px 24px #2223`,
-                  }
-                : {}
-            }
-          >
-            {region}
-          </button>
-        ))}
+        {REGION_LIST.filter((region) => region !== "Other").map((region) => {
+          const isActive = selectedArr.includes(region);
+          const isUnselecting = unselectingRegions.includes(region);
+          return (
+            <button
+              key={region}
+              data-region={region}
+              onClick={() =>
+                isActive ? handleRegionToggle(region) : handleRegionClick(region)
+              }
+              className={[
+                "region-btn",
+                isActive ? "region-btn--active" : "",
+                isUnselecting ? "unselecting" : ""
+              ].join(" ")}
+              style={
+                isActive
+                  ? {
+                      background: `${regionColors(region)}22`,
+                      boxShadow: `0 0 0 3px ${regionColors(region)}80, 0 4px 24px #2223`,
+                    }
+                  : {}
+              }
+              disabled={isUnselecting}
+            >
+              {region}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Contrôles animation alignés - MODIFIÉS */}
+      {/* Contrôles animation alignés */}
       <div
         className="center-controls-wrapper flex items-center gap-4 w-full"
         style={{
@@ -711,7 +750,9 @@ export default function AnimatedTreemapGDP({
           ref={svgRef}
           width={width}
           height={height}
-          onMouseLeave={hideTooltip}
+          onMouseMove={e => setMousePos({ x: e.clientX, y: e.clientY })}
+          onMouseLeave={() => setMousePos(null)}
+          onClick={handleSvgClick}
           style={{
             display: "block",
             minWidth: 360,

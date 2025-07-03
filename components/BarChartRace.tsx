@@ -13,7 +13,7 @@ function formatNumberSpace(num: number) {
 const margin = { top: 40, right: 40, bottom: 60, left: 40 };
 const barHeight = 32;
 const barPadding = 8;
-const topN = 18;
+const topN = 20;
 const MIN_BAR_LABEL_WIDTH = 100;
 
 interface CountryData {
@@ -21,7 +21,7 @@ interface CountryData {
   gdp: number;
   country: string;
   region: string;
-  [key: string]: any; // fallback pour compatibilité données non typées
+  [key: string]: any;
 }
 
 interface BarChartRaceProps {
@@ -55,17 +55,25 @@ export default function BarChartRace({
 }: BarChartRaceProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [containerSize, setContainerSize] = useState({ width: 1200, height: 760 });
+  const sliderRef = useRef<HTMLInputElement | null>(null);
 
-  // Safe resizing
+  // Responsive container (height: 100% of parent)
+  const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
+
   useEffect(() => {
     function handleResize() {
       if (!containerRef.current) return;
       const width = containerRef.current.offsetWidth || 1200;
-      const barsHeight = topN * (barHeight + barPadding) + margin.top + margin.bottom;
+      const totalHeight = containerRef.current.offsetHeight || 600;
+      const controlsHeight = 185; // ajuste selon ton layout
+      const height = Math.max(
+        320,
+        totalHeight - controlsHeight,
+        topN * (barHeight + barPadding) + margin.top + margin.bottom
+      );
       setContainerSize({
         width: Math.max(360, width),
-        height: Math.max(400, Math.round(barsHeight)),
+        height: Math.round(height),
       });
     }
     handleResize();
@@ -81,20 +89,66 @@ export default function BarChartRace({
   const width = containerSize.width;
   const height = containerSize.height;
 
-  // Pour l’animation (toujours frais dans closures)
+  // --- unselectingRegions state (désoulignement animé)
+  const [unselectingRegions, setUnselectingRegions] = useState<string[]>([]);
+
+  // --- Gestion boutons région (copié du Treemap)
+  const regionListClean = REGION_LIST.filter(r => r !== "Other");
+  const safeSelectedRegions =
+    !selectedRegions || selectedRegions.length === 0
+      ? regionListClean
+      : selectedRegions.filter((r) => r !== "Other");
+
+  function handleRegionToggle(region: string) {
+    if (region === "Other") return;
+    setSelectedRegions((current) => {
+      if (!current || current === null) return [region];
+      if (current.includes(region)) {
+        setUnselectingRegions((prev) => [...prev, region]);
+        setTimeout(() => {
+          setUnselectingRegions((prev) => prev.filter(r => r !== region));
+        }, 350);
+        const next = current.filter((r) => r !== region);
+        return next.length === 0 ? null : next;
+      } else {
+        return [...current, region];
+      }
+    });
+  }
+  function handleRegionClick(region: string) {
+    if (region === "Other") return;
+    setSelectedRegions((current) => {
+      if (!current || current === null) return [region];
+      if (current.includes(region)) return current;
+      return [...current, region];
+    });
+  }
+  function handleWorldClick() {
+    setSelectedRegions(null);
+  }
+
+  // Slider style: animation du gradient, identique au Treemap
+  useEffect(() => {
+    const el = sliderRef.current;
+    if (!el) return;
+    function setProgress() {
+      const value = Number(el.value);
+      const min = Number(el.min);
+      const max = Number(el.max);
+      const percent = ((value - min) / (max - min)) * 100;
+      el.style.setProperty("--progress", `${percent}%`);
+    }
+    setProgress();
+    el.addEventListener("input", setProgress);
+    return () => el.removeEventListener("input", setProgress);
+  }, [years, animValue]);
+
+  // Animation (barres)
   const playingRef = useRef(playing);
   const yearRef = useRef(year);
   useEffect(() => { playingRef.current = playing; }, [playing]);
   useEffect(() => { yearRef.current = year; }, [year]);
 
-  // Liste des régions affichables (jamais "Other")
-  const regionListClean = REGION_LIST.filter(r => r !== "Other");
-  const getRegionsArray = () =>
-    !selectedRegions || selectedRegions.length === 0
-      ? regionListClean
-      : selectedRegions.filter(r => r !== "Other");
-
-  // Génère les keyframes pour chaque année
   function createKeyframes(
     data: CountryData[],
     years: number[],
@@ -117,14 +171,15 @@ export default function BarChartRace({
     });
   }
 
-  // ToolTip logic
+  // --- Tooltip: on ne garde que la position de la souris ---
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   function useTooltip() {
     const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
     function showTooltip(x: number, y: number, content: string) { setTooltip({ show: true, x, y, content }); }
     function hideTooltip() { setTooltip({ show: false, x: 0, y: 0, content: "" }); }
-    return { tooltip, showTooltip, hideTooltip };
+    return { tooltip, showTooltip, hideTooltip, setTooltip };
   }
-  const { tooltip, showTooltip, hideTooltip } = useTooltip();
+  const { tooltip, setTooltip } = useTooltip();
 
   // LABELS logic
   const labels = (svg: any) => {
@@ -167,11 +222,9 @@ export default function BarChartRace({
               : d.country.slice(0, 19).toUpperCase() + "…"
           )
           .on("click", () => setCountryFocus(d.country));
-
         let valueLabel = isPerCapita
           ? `$${formatNumberSpace(d.gdp)}`
           : `$${formatNumberSpace(Math.round(d.gdp / 1e6) / 1e3)}B`;
-
         svg.append("text")
           .attr("class", "value-label")
           .attr("x", valueX)
@@ -217,18 +270,8 @@ export default function BarChartRace({
               )
               .attr("rx", 2)
               .attr("cursor", "pointer")
-              .on("click", (_e: any, d: any) => setCountryFocus(d.country))
-              .on("mousemove", function (e: any, d: any) {
-                let valueLabel = isPerCapita
-                  ? `$${formatNumberSpace(d.gdp)}`
-                  : `$${formatNumberSpace(Math.round(d.gdp / 1e6) / 1e3)}B`;
-                showTooltip(
-                  e.clientX + 20,
-                  e.clientY - 20,
-                  `<b>${d.country}</b><br>${valueLabel}`
-                );
-              })
-              .on("mouseleave", hideTooltip);
+              .on("click", (_e: any, d: any) => setCountryFocus(d.country));
+            // --- NE METS PLUS de .on("mousemove") ici, gestion globale par SVG ---
             return g;
           },
           (update: any) => {
@@ -299,7 +342,7 @@ export default function BarChartRace({
     };
   }, [playing, year, years, data, onYearChange, setPlaying]);
 
-  // RENDER + TOOLTIP
+  // RENDER + TOOLTIP toujours à jour et “live” (même quand les barres changent d’ordre)
   useEffect(() => {
     if (!svgRef.current || data.length === 0 || years.length === 0) return;
 
@@ -311,7 +354,7 @@ export default function BarChartRace({
     const y1Clamped = Math.max(years[0], Math.min(years[years.length - 1], y1));
     const y2Clamped = Math.max(years[0], Math.min(years[years.length - 1], y2));
 
-    const regionsArray = getRegionsArray();
+    const regionsArray = safeSelectedRegions;
 
     const kf1 = createKeyframes(data, [y1Clamped], regionsArray)[0] as [number, CountryData[], number];
     const kf2 = createKeyframes(data, [y2Clamped], regionsArray)[0] as [number, CountryData[], number];
@@ -342,12 +385,9 @@ export default function BarChartRace({
       .attr("height", height);
     svg.selectAll("*").remove();
 
-    const updateBars = bars(svg);
-    const updateLabels = labels(svg);
-
-    const keyframeInterp: [number, CountryData[], number] = [interpYear, interpTop, interpMax];
-    updateBars(keyframeInterp, null);
-    updateLabels(keyframeInterp, null);
+    // Bars et labels
+    bars(svg)([interpYear, interpTop, interpMax], null);
+    labels(svg)([interpYear, interpTop, interpMax], null);
 
     // Axe X formaté
     const x = d3.scaleLinear()
@@ -369,26 +409,42 @@ export default function BarChartRace({
       .attr("font-size", 14)
       .attr("fill", "#fff")
       .attr("font-family", "Inter, sans-serif");
-  }, [animValue, selectedRegions, data, years, countryFocus, isPerCapita, width, height]);
 
-  // --- Sélection régions
-  const toggleRegion = (region: string) => {
-    if (region === "Other") return;
-    setSelectedRegions(current => {
-      if (!current || current.length === 0) {
-        return [region];
-      }
-      if (current.includes(region)) {
-        const next = current.filter((r) => r !== region);
-        return next.length === 0 ? null : next;
+    // --- Tooltip live : calcule dynamiquement le pays sous la souris
+    if (mousePos && svgRef.current) {
+      const svgRect = svgRef.current.getBoundingClientRect();
+      const mouseY = mousePos.y - svgRect.top;
+      const i = Math.floor((mouseY - margin.top) / (barHeight + barPadding));
+      if (i >= 0 && i < interpTop.length) {
+        const d = interpTop[i];
+        let valueLabel = isPerCapita
+          ? `$${formatNumberSpace(d.gdp)}`
+          : `$${formatNumberSpace(Math.round(d.gdp / 1e6) / 1e3)}B`;
+        setTooltip({
+          show: true,
+          x: mousePos.x + 20,
+          y: mousePos.y - 20,
+          content: `<b>${d.country}</b><br>${valueLabel}`,
+        });
       } else {
-        return [...current, region];
+        setTooltip({ show: false, x: 0, y: 0, content: "" });
       }
-    });
-  };
-  const selectAllRegions = () => {
-    setSelectedRegions(null);
-  };
+    } else {
+      setTooltip({ show: false, x: 0, y: 0, content: "" });
+    }
+
+  }, [
+    animValue,
+    mousePos,
+    selectedRegions,
+    data,
+    years,
+    countryFocus,
+    isPerCapita,
+    width,
+    height,
+    setTooltip,
+  ]);
 
   function handlePlayPause() {
     if (playing) {
@@ -420,69 +476,102 @@ export default function BarChartRace({
 
   if (!year || years.length === 0) return <div>Loading…</div>;
 
+  const selectedArr = Array.isArray(selectedRegions) ? selectedRegions : [];
+
   return (
-    <div ref={containerRef} className="flex flex-col items-center gap-4 mt-4 w-full">
-      <div className="flex flex-wrap gap-3 justify-center p-4 rounded-2xl bg-white/10 shadow-2xl backdrop-blur-md">
+    <div
+      ref={containerRef}
+      className="flex flex-col items-center gap-4 mt-4 w-full"
+      style={{
+        flex: 1,
+        minHeight: 0,
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
+      {/* Boutons région avec anim désoulignement */}
+      <div className="flex flex-wrap gap-3 justify-center p-4 rounded-2xl">
         <button
-          onClick={selectAllRegions}
+          onClick={handleWorldClick}
           className={`region-btn${!selectedRegions || selectedRegions.length === 0 ? " region-btn--active" : ""}`}
         >
           🌍 World
         </button>
-        {regionListClean.map((region) => (
-          <button
-            key={region}
-            onClick={() => toggleRegion(region)}
-            className={`region-btn${
-              selectedRegions &&
-              selectedRegions.length > 0 &&
-              selectedRegions.includes(region)
-                ? " region-btn--active"
-                : ""
-            }`}
-            style={
-              selectedRegions &&
-              selectedRegions.length > 0 &&
-              selectedRegions.includes(region)
-                ? {
-                    background: `${regionColors(region)}22`,
-                    boxShadow: `0 0 0 3px ${regionColors(region)}80, 0 4px 24px #2223`,
-                  }
-                : {}
-            }
-          >
-            {region}
-          </button>
-        ))}
+        {regionListClean.map((region) => {
+          const isActive = selectedArr.includes(region);
+          const isUnselecting = unselectingRegions.includes(region);
+          return (
+            <button
+              key={region}
+              data-region={region}
+              onClick={() =>
+                isActive ? handleRegionToggle(region) : handleRegionClick(region)
+              }
+              className={[
+                "region-btn",
+                isActive ? "region-btn--active" : "",
+                isUnselecting ? "unselecting" : ""
+              ].join(" ")}
+              style={
+                isActive
+                  ? {
+                      background: `${regionColors(region)}22`,
+                      boxShadow: `0 0 0 3px ${regionColors(region)}80, 0 4px 24px #2223`,
+                    }
+                  : {}
+              }
+              disabled={isUnselecting}
+            >
+              {region}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="center-controls-wrapper flex items-center gap-4 w-full" style={{ minWidth: 320, maxWidth: 1280, margin: "0 auto" }}>
+      {/* Contrôles alignés (Play, slider, années, focus) - slider identique au Treemap */}
+      <div
+        className="center-controls-wrapper flex items-center gap-4 w-full"
+        style={{
+          minWidth: 300,
+          maxWidth: 1280,
+          margin: "0 auto",
+          padding: "6px 0",
+          fontSize: 13,
+          lineHeight: "1.2",
+        }}
+      >
         <div className="shrink-0 flex items-center">
           <PlayPauseButton
             playing={playing}
             onClick={handlePlayPause}
-            size={48}
+            size={34}
             disabled={years.length < 2}
           />
         </div>
-        <div className="flex-1 flex items-center">
+        {/* Slider */}
+        <div className="flex-1 flex items-center justify-center min-w-[120px]">
           <input
+            ref={sliderRef}
             type="range"
             min={years[0]}
             max={years[years.length - 1]}
             step={0.01}
             value={animValue}
             onChange={(e) => onYearChange(Math.round(Number(e.target.value)))}
-            className="w-full h-2 bg-white/30 rounded-lg appearance-none cursor-pointer"
-            style={{ minWidth: 120, maxWidth: 350 }}
+            className="w-full h-1.5 bg-white/30 rounded-lg accent-blue-400"
+            style={{ minWidth: 90, maxWidth: 250, height: 5 }}
           />
         </div>
-        <div>
+        {/* Année */}
+        <div className="flex flex-col justify-center items-center min-w-[60px]">
           <select
             value={Math.round(animValue)}
             onChange={(e) => onYearChange(Number(e.target.value))}
-            className="select-glass ml-3 px-3 py-2"
-            style={{ minWidth: 80 }}
+            className="select-glass px-2 py-1 text-[1rem] font-semibold text-center"
+            style={{ minWidth: 48, fontSize: 15, padding: "3px 8px" }}
           >
             {years.map((y) => (
               <option key={y} value={y}>
@@ -491,6 +580,7 @@ export default function BarChartRace({
             ))}
           </select>
         </div>
+        {/* Focus Country */}
         <div className="flex-1 flex justify-end items-center min-w-[130px] ml-3">
           <select
             value={countryFocus ?? ""}
@@ -516,7 +606,26 @@ export default function BarChartRace({
           )}
         </div>
       </div>
-      <svg ref={svgRef} onMouseLeave={hideTooltip}></svg>
+      {/* SVG qui prend toute la hauteur dispo */}
+      <div
+        className="w-full overflow-x-auto"
+        style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}
+      >
+        <svg
+          ref={svgRef}
+          width={width}
+          height={height}
+          style={{
+            display: "block",
+            minWidth: 360,
+            minHeight: 320,
+            maxWidth: "100%",
+            maxHeight: "100%",
+          }}
+          onMouseMove={e => setMousePos({ x: e.clientX, y: e.clientY })}
+          onMouseLeave={() => setMousePos(null)}
+        ></svg>
+      </div>
       {/* Tooltip HTML (en dehors du SVG) */}
       {tooltip.show && (
         <div
