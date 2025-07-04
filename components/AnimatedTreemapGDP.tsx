@@ -41,6 +41,47 @@ export default function AnimatedTreemapGDP({
     value: null,
   });
 
+  // Pour le timeout ultime anti-bug
+  const lastTooltipSeen = useRef(Date.now());
+  const timeoutRef = useRef();
+
+  // TIMEOUT AUTOCLOSE du tooltip si rien ne le ferme "proprement"
+  useEffect(() => {
+    if (tooltip.show) {
+      // Clear timeout si déjà lancé
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      // Programme une fermeture forcée après 1000ms sans mousemove
+      timeoutRef.current = setTimeout(() => {
+        if (Date.now() - lastTooltipSeen.current >= 950) {
+          setTooltip(tt => (tt.show ? { ...tt, show: false } : tt));
+        }
+      }, 1000);
+    }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [tooltip.show, tooltip.x, tooltip.y]);
+
+  // Mise à jour du "dernier mouvement"
+  function touchTooltip() {
+    lastTooltipSeen.current = Date.now();
+  }
+
+  // --- FERMETURE TOOLTIP globale, la plus robuste ---
+  useEffect(() => {
+    function handleWindowBlurOrMouseOut(e) {
+      if (!e.relatedTarget || e.type === "blur") {
+        setTooltip((tt) => (tt.show ? { ...tt, show: false } : tt));
+      }
+    }
+    window.addEventListener("mouseout", handleWindowBlurOrMouseOut);
+    window.addEventListener("blur", handleWindowBlurOrMouseOut);
+    return () => {
+      window.removeEventListener("mouseout", handleWindowBlurOrMouseOut);
+      window.removeEventListener("blur", handleWindowBlurOrMouseOut);
+    };
+  }, []);
+
   const [focusValue, setFocusValue] = useState(null);
 
   // Responsive
@@ -415,6 +456,7 @@ export default function AnimatedTreemapGDP({
               name: d.country,
               value: d.value,
             });
+            touchTooltip();
           })
           .on("mouseleave", function () {
             setTooltip((tt) => tt.show ? { ...tt, show: false } : tt);
@@ -535,6 +577,7 @@ export default function AnimatedTreemapGDP({
             alignItems: "flex-start",
             fontFamily: "Inter, Arial, sans-serif",
           }}
+          onMouseMove={touchTooltip}
         >
           <span
             style={{
@@ -750,6 +793,7 @@ export default function AnimatedTreemapGDP({
       <div
         className="w-full overflow-x-auto"
         style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}
+        onMouseLeave={() => setTooltip((tt) => tt.show ? { ...tt, show: false } : tt)}
       >
         <svg
           ref={svgRef}
@@ -763,6 +807,7 @@ export default function AnimatedTreemapGDP({
             maxWidth: "100%",
             maxHeight: "100%",
           }}
+          onMouseLeave={() => setTooltip((tt) => tt.show ? { ...tt, show: false } : tt)}
         ></svg>
       </div>
     </div>
