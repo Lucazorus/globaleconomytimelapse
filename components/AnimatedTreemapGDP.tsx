@@ -43,7 +43,7 @@ export default function AnimatedTreemapGDP({
 
   // Pour le timeout ultime anti-bug
   const lastTooltipSeen = useRef(Date.now());
-  const timeoutRef = useRef();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // TIMEOUT AUTOCLOSE du tooltip si rien ne le ferme "proprement"
   useEffect(() => {
