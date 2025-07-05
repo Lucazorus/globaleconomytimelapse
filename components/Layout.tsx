@@ -1,9 +1,22 @@
 "use client";
-import React, { ReactNode } from "react";
+import React, { ReactNode, useState, useEffect } from "react";
 import Script from "next/script";
 import { Inter } from "next/font/google";
 import { useRive, Layout as RiveLayout, Fit, Alignment } from "@rive-app/react-canvas";
 const inter = Inter({ subsets: ["latin"] });
+
+// Hook custom pour récupérer la largeur de la fenêtre
+function useWindowWidth() {
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    function handleResize() {
+      setWidth(window.innerWidth);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+  return width;
+}
 
 // Typage des props
 interface LayoutProps {
@@ -53,6 +66,9 @@ function LogoHeader() {
 }
 
 const Layout = ({ children, title }: LayoutProps) => {
+  const width = useWindowWidth();
+  const isMobile = width <= 600;
+
   return (
     <>
       {/* Google Analytics */}
@@ -91,15 +107,18 @@ const Layout = ({ children, title }: LayoutProps) => {
             <span
               style={{
                 marginLeft: 16,
-                fontSize: 25,
+                fontSize: isMobile ? 15 : 25,
                 fontWeight: 400,
                 color: "#e9eef4",
-                lineHeight: "40px",
+                lineHeight: isMobile ? "28px" : "40px",
                 display: "inline-block",
                 verticalAlign: "middle",
                 whiteSpace: "nowrap",
                 letterSpacing: "0.05em",
                 textTransform: "uppercase",
+                maxWidth: isMobile ? "calc(100vw - 90px)" : undefined,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
             >
               Global Economy Timelapse
