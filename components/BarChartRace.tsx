@@ -158,10 +158,6 @@ export default function BarChartRace({
     };
   }, [playing, year, years, data, onYearChange, setPlaying]);
 
-  // Tooltip
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
-  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: "" });
-
   // Focus GDP à afficher (synchronisé à chaque render)
   const [focusGDP, setFocusGDP] = useState<string>("");
 
@@ -387,32 +383,8 @@ export default function BarChartRace({
       .attr("font-size", 14)
       .attr("fill", "#fff")
       .attr("font-family", "Inter, sans-serif");
-
-    // Tooltip live (affichage)
-    if (!playing && mousePos && svgRef.current) {
-      const svgRect = svgRef.current.getBoundingClientRect();
-      const mouseY = mousePos.y - svgRect.top;
-      const i = Math.floor((mouseY - margin.top) / (barHeight + barPadding));
-      if (i >= 0 && i < interpTop.length) {
-        const d = interpTop[i];
-        let valueLabel = isPerCapita
-          ? `$${formatNumberSpace(d.gdp)}`
-          : `$${formatNumberSpace(Math.round(d.gdp / 1e9))}B`;
-        setTooltip({
-          show: true,
-          x: mousePos.x + 20,
-          y: mousePos.y - 20,
-          content: `<b>${d.country}</b><br>${valueLabel}`,
-        });
-      } else {
-        setTooltip({ show: false, x: 0, y: 0, content: "" });
-      }
-    } else {
-      setTooltip({ show: false, x: 0, y: 0, content: "" });
-    }
   }, [
     animValue,
-    mousePos,
     selectedRegions,
     data,
     years,
@@ -639,34 +611,8 @@ export default function BarChartRace({
             maxWidth: "100%",
             maxHeight: "100%",
           }}
-          onMouseMove={e => setMousePos({ x: e.clientX, y: e.clientY })}
-          onMouseLeave={() => setMousePos(null)}
         ></svg>
       </div>
-      {/* Tooltip */}
-      {!playing && tooltip.show && (
-        <div
-          style={{
-            position: "fixed",
-            pointerEvents: "none",
-            top: tooltip.y - 70,
-            left: tooltip.x - 100,
-            background: "rgba(22,28,40,0.97)",
-            color: "#fff",
-            borderRadius: 10,
-            padding: "9px 15px",
-            fontSize: 16,
-            fontFamily: "Inter, Arial, sans-serif",
-            fontWeight: 300,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-            minWidth: 120,
-            zIndex: 1001,
-            boxShadow: "0 4px 24px #1116"
-          }}
-          dangerouslySetInnerHTML={{ __html: tooltip.content }}
-        />
-      )}
     </div>
   );
 }
