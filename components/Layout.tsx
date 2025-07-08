@@ -140,36 +140,60 @@ const Layout = ({ children, title }: LayoutProps) => {
         >
           {children}
         </main>
-        <footer
-          style={{
-            flexShrink: 0,
-            width: "100%",
-            borderTop: "1px solid #283030",
-            padding: "12px 0 10px 0",
-            textAlign: "center",
-            color: "#94a3b8",
-            fontSize: "12px",
-            opacity: 0.80,
-            background: "#1a2327",
-          }}
-        >
-          Made with <span style={{ color: "#fb7185" }}>♥</span> by{" "}
-          <a
-            href="https://www.linkedin.com/in/lucas-massoni/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: "#6FAF84",
-              textDecoration: "underline",
-              transition: "color 0.3s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#559C6B")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#6FAF84")}
-          >
-            Lucas Massoni
-          </a>{" "}
-          - 2025
-        </footer>
+       <footer
+  style={{
+    flexShrink: 0,
+    width: "100%",
+    borderTop: "1px solid #283030",
+    padding: "12px 0 10px 0",
+    textAlign: "center",
+    color: "#94a3b8",
+    fontSize: "12px",
+    opacity: 0.80,
+    background: "#1a2327",
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  }}
+>
+  <div>
+    Made with <span style={{ color: "#fb7185" }}>♥</span> by{" "}
+    <a
+      href="https://www.linkedin.com/in/lucas-massoni/"
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        color: "#6FAF84",
+        textDecoration: "underline",
+        transition: "color 0.3s",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "#559C6B")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "#6FAF84")}
+    >
+      Lucas Massoni
+    </a>{" "}
+    - 2025
+    &nbsp;|&nbsp;
+    Data source:{" "}
+    <a
+      href="https://www.worldbank.org/ext/en/home/"
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        color: "#52a6df",
+        textDecoration: "underline",
+        transition: "color 0.3s",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "#559C6B")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "#6FAF84")}
+    >
+      worldbank.org
+    </a>
+  </div>
+</footer>
+
       </div>
     </>
   );
