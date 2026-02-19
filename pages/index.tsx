@@ -1,22 +1,94 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/router";
 import AnimatedTreemapGDP from "../components/AnimatedTreemapGDP";
 import BarChartRace from "../components/BarChartRace";
+import { useLang } from "../lib/LangContext";
 
-function findClosestYear(target, years) {
+// --- Helpers ---
+function findClosestYear(target: number, years: number[]): number | null {
   if (!years || years.length === 0) return null;
   return years.reduce((prev, curr) =>
     Math.abs(curr - target) < Math.abs(prev - target) ? curr : prev
   );
 }
 
+// --- URL parsing helpers ---
+type ChartType = "treemap" | "barchart";
+type MetricType = "gdp" | "percap" | "ppp";
+const VALID_CHARTS: ChartType[] = ["treemap", "barchart"];
+const VALID_METRICS: MetricType[] = ["gdp", "percap", "ppp"];
+
+// Keep GraphType for URL compat
+type GraphType = "treemap" | "barchart";
+
+// METRIC_INFO is built dynamically from translations — see getMetricInfo() below
+
+function parseChart(val: string | string[] | undefined): ChartType {
+  if (typeof val === "string" && VALID_CHARTS.includes(val as ChartType)) {
+    return val as ChartType;
+  }
+  return "treemap";
+}
+
+function parseMetric(val: string | string[] | undefined): MetricType {
+  if (typeof val === "string" && VALID_METRICS.includes(val as MetricType)) {
+    return val as MetricType;
+  }
+  return "gdp";
+}
+
+function parseGraph(val: string | string[] | undefined): GraphType {
+  if (typeof val === "string" && VALID_CHARTS.includes(val as ChartType)) {
+    return val as GraphType;
+  }
+  return "treemap";
+}
+
+function parseMode(val: string | string[] | undefined): "world" | "ffa" {
+  if (val === "ffa") return "ffa";
+  return "world";
+}
+
+function parseRegions(val: string | string[] | undefined): string[] | null {
+  if (typeof val !== "string" || val.trim() === "") return null;
+  const arr = val.split(",").map((r) => r.trim()).filter(Boolean);
+  return arr.length > 0 ? arr : null;
+}
+
+function parseProportional(val: string | string[] | undefined): boolean {
+  if (val === "false") return false;
+  return true;
+}
+
+function parseYear(val: string | string[] | undefined): number | null {
+  if (typeof val !== "string") return null;
+  const n = parseInt(val, 10);
+  return isNaN(n) ? null : n;
+}
+
+function parseCountry(val: string | string[] | undefined): string | null {
+  if (typeof val === "string" && val.trim() !== "") return val.trim();
+  return null;
+}
+
 export default function Home() {
+  const router = useRouter();
+  const { t } = useLang();
+
+  // Empêche l'écriture URL avant la lecture initiale
+  const urlInitialized = useRef(false);
+  // Année issue de l'URL, en attente que les données soient chargées
+  const pendingUrlYear = useRef<number | null>(null);
+
   const [data, setData] = useState<any[]>([]);
   const [years, setYears] = useState<number[]>([]);
   const [dataPerCapita, setDataPerCapita] = useState<any[]>([]);
   const [yearsPerCapita, setYearsPerCapita] = useState<number[]>([]);
-  const [graph, setGraph] = useState<
-    "treemap" | "barchart" | "treemap_percap" | "barchart_percap"
-  >("treemap");
+  const [dataPercapPpp, setDataPercapPpp] = useState<any[]>([]);
+  const [yearsPercapPpp, setYearsPercapPpp] = useState<number[]>([]);
+
+  const [graph, setGraph] = useState<ChartType>("treemap");
+  const [metric, setMetric] = useState<MetricType>("gdp");
   const [activeYear, setActiveYear] = useState<number | null>(null);
   const [animValue, setAnimValue] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -24,52 +96,113 @@ export default function Home() {
   const [mode, setMode] = useState<"world" | "ffa">("world");
   const [selectedRegions, setSelectedRegions] = useState<null | string[]>(null);
   const [proportional, setProportional] = useState(true);
+  const [topN, setTopN] = useState(20);
 
+  // --- Étape 1 : Lecture URL au mount (une seule fois) ---
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (urlInitialized.current) return;
+
+    const q = router.query;
+
+    setGraph(parseChart(q.graph));
+    setMetric(parseMetric(q.metric));
+    setMode(parseMode(q.mode));
+    setSelectedRegions(parseRegions(q.region));
+    setProportional(parseProportional(q.proportional));
+    setCountryFocus(parseCountry(q.country));
+
+    pendingUrlYear.current = parseYear(q.year);
+
+    urlInitialized.current = true;
+    // eslint-disable-next-line
+  }, [router.isReady]);
+
+  // --- Étape 2 : Fetch GDP total ---
   useEffect(() => {
     fetch("/data/gdp_by_country_year_with_region.json")
       .then((res) => res.json())
       .then((json) => {
         const yearsSet = new Set(json.map((d: any) => d.year));
-        const yearsArr = Array.from(yearsSet).map(Number).sort((a, b) => a - b);
+        const yearsArr = Array.from(yearsSet).map(Number).sort((a, b) => a - b) as number[];
         setData(json);
         setYears(yearsArr);
         if (activeYear == null) {
-          setActiveYear(yearsArr[0]);
-          setAnimValue(yearsArr[0]);
+          const targetYear =
+            pendingUrlYear.current != null
+              ? findClosestYear(pendingUrlYear.current, yearsArr) ?? yearsArr[0]
+              : yearsArr[0];
+          setActiveYear(targetYear);
+          setAnimValue(targetYear);
         }
       });
     // eslint-disable-next-line
   }, []);
 
+  // --- Étape 3 : Fetch GDP per capita ---
   useEffect(() => {
     fetch("/data/gdp_per_capita_by_country_year.json")
       .then((res) => res.json())
       .then((json) => {
         const yearsSet = new Set(json.map((d: any) => d.year));
-        const yearsArr = Array.from(yearsSet).map(Number).sort((a, b) => a - b);
+        const yearsArr = Array.from(yearsSet).map(Number).sort((a, b) => a - b) as number[];
         setDataPerCapita(json);
         setYearsPerCapita(yearsArr);
       });
   }, []);
 
+  // --- Étape 3b : Fetch GDP per capita PPP ---
+  useEffect(() => {
+    fetch("/data/gdp_per_capita_ppp_by_country_year.json")
+      .then((res) => res.json())
+      .then((json) => {
+        const yearsSet = new Set(json.map((d: any) => d.year));
+        const yearsArr = Array.from(yearsSet).map(Number).sort((a, b) => a - b) as number[];
+        setDataPercapPpp(json);
+        setYearsPercapPpp(yearsArr);
+      });
+  }, []);
+
+  // --- Étape 4 : Snap année au plus proche quand la métrique change ---
   useEffect(() => {
     if (activeYear == null) return;
-    let targetYears: number[] = [];
-    if (graph === "treemap" || graph === "barchart") {
-      targetYears = years;
-    } else {
-      targetYears = yearsPerCapita;
-    }
+    let targetYears: number[];
+    if (metric === "gdp") targetYears = years;
+    else if (metric === "percap") targetYears = yearsPerCapita;
+    else targetYears = yearsPercapPpp;
     if (targetYears && targetYears.length > 0) {
       const closest = findClosestYear(activeYear, targetYears);
-      if (closest !== activeYear) {
+      if (closest !== activeYear && closest != null) {
         setActiveYear(closest);
         setAnimValue(closest);
       }
     }
     // eslint-disable-next-line
-  }, [graph, years, yearsPerCapita]);
+  }, [metric, years, yearsPerCapita, yearsPercapPpp]);
 
+  // --- Étape 5 : Sync état → URL (shallow replace) ---
+  useEffect(() => {
+    if (!urlInitialized.current || activeYear == null) return;
+
+    const query: Record<string, string> = {
+      graph,
+      metric,
+      year: String(activeYear),
+      mode,
+      proportional: String(proportional),
+    };
+    if (selectedRegions && selectedRegions.length > 0) {
+      query.region = selectedRegions.join(",");
+    }
+    if (countryFocus) {
+      query.country = countryFocus;
+    }
+
+    router.replace({ pathname: "/", query }, undefined, { shallow: true });
+    // eslint-disable-next-line
+  }, [graph, metric, activeYear, mode, proportional, selectedRegions, countryFocus]);
+
+  // --- Handlers ---
   const handleYearChange = (val: number | ((v: number) => number)) => {
     setAnimValue((prev) =>
       typeof val === "function" ? val(prev ?? activeYear ?? years[0]) : val
@@ -81,20 +214,22 @@ export default function Home() {
     );
   };
 
+  function getActiveYears(): number[] {
+    if (metric === "gdp") return years;
+    if (metric === "percap") return yearsPerCapita;
+    return yearsPercapPpp;
+  }
+
   function handlePlayPause() {
     if (playing) {
       const snapped = Math.round(animValue ?? activeYear ?? years[0]);
       handleYearChange(snapped);
       setPlaying(false);
     } else {
-      let maxYear =
-        graph === "treemap" || graph === "barchart"
-          ? years.at(-1)
-          : yearsPerCapita.at(-1);
+      const activeYears = getActiveYears();
+      const maxYear = activeYears.at(-1);
       if ((animValue ?? activeYear ?? 0) >= (maxYear ?? 9999) - 0.01) {
-        handleYearChange(
-          graph === "treemap" || graph === "barchart" ? years[0] : yearsPerCapita[0]
-        );
+        handleYearChange(activeYears[0]);
         setTimeout(() => setPlaying(true), 0);
       } else {
         setPlaying(true);
@@ -102,29 +237,88 @@ export default function Home() {
     }
   }
 
+  // --- Recherche de pays ---
+  const [searchInput, setSearchInput] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Dataset courant pour la liste des pays
+  const currentDataForSearch =
+    metric === "gdp" ? data :
+    metric === "percap" ? dataPerCapita :
+    dataPercapPpp;
+
+  const allCountries: string[] = Array.from(
+    new Set(
+      currentDataForSearch.map((d: any) => d.country as string).filter(Boolean)
+    )
+  ).sort();
+
+  const filteredCountries =
+    searchInput.trim() === ""
+      ? allCountries
+      : allCountries.filter((c) =>
+          c.toLowerCase().includes(searchInput.toLowerCase())
+        );
+
+  // Sync input ← countryFocus (clic dans le graphe)
+  useEffect(() => {
+    setSearchInput(countryFocus ?? "");
+  }, [countryFocus]);
+
+  // Fermeture dropdown au clic extérieur
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleSearchSelect(country: string) {
+    setCountryFocus(country);
+    setSearchInput(country);
+    setSearchOpen(false);
+  }
+
+  function handleSearchClear() {
+    setCountryFocus(null);
+    setSearchInput("");
+    setSearchOpen(false);
+  }
+
+  // --- Loading guard ---
   const isLoading =
-    (["treemap", "barchart"].includes(graph) &&
-      (years.length === 0 ||
-        data.length === 0 ||
-        activeYear == null ||
-        animValue == null)) ||
-    (["treemap_percap", "barchart_percap"].includes(graph) &&
-      (yearsPerCapita.length === 0 ||
-        dataPerCapita.length === 0 ||
-        activeYear == null ||
-        animValue == null));
+    activeYear == null || animValue == null ||
+    (metric === "gdp" && (years.length === 0 || data.length === 0)) ||
+    (metric === "percap" && (yearsPerCapita.length === 0 || dataPerCapita.length === 0)) ||
+    (metric === "ppp" && (yearsPercapPpp.length === 0 || dataPercapPpp.length === 0));
 
   if (isLoading)
     return (
       <div className="flex-1 flex items-center justify-center w-full h-full bg-[#1E2D2F]">
-        <div className="text-xl text-slate-100">Loading…</div>
+        <div className="text-xl text-slate-100">{t.loading}</div>
       </div>
     );
 
   const currentData =
-    graph === "treemap" || graph === "barchart" ? data : dataPerCapita;
+    metric === "gdp" ? data :
+    metric === "percap" ? dataPerCapita :
+    dataPercapPpp;
   const currentYears =
-    graph === "treemap" || graph === "barchart" ? years : yearsPerCapita;
+    metric === "gdp" ? years :
+    metric === "percap" ? yearsPerCapita :
+    yearsPercapPpp;
+  const isPerCapita = metric === "percap" || metric === "ppp";
+
+  const metricInfo: Record<MetricType, { label: string; title: string; description: string; example: string }> = {
+    gdp:    { label: t.gdpLabel,    title: t.gdpTitle,    description: t.gdpDesc,    example: t.gdpExample },
+    percap: { label: t.percapLabel, title: t.percapTitle, description: t.percapDesc, example: t.percapExample },
+    ppp:    { label: t.pppLabel,    title: t.pppTitle,    description: t.pppDesc,    example: t.pppExample },
+  };
+  const info = metricInfo[metric];
 
   return (
     <div
@@ -139,45 +333,114 @@ export default function Home() {
         padding: 0,
       }}
     >
-      {/* Onglets de graph, compact */}
+      {/* Barre de contrôles */}
       <div className="w-full mb-2">
         <div
-          className="flex flex-wrap justify-center items-center gap-2 p-2 rounded-2xl"
-          style={{
-            flexWrap: "wrap",
-            gap: "0.15rem 0.35rem",
-            marginBottom: 0,
-            minHeight: "38px",
-          }}
+          className="flex flex-wrap justify-center items-center p-2 rounded-2xl"
+          style={{ gap: "0.15rem 0.35rem", marginBottom: 0, minHeight: "38px" }}
         >
-          {[
-            { value: "treemap", label: "GDP TREEMAP" },
-            { value: "barchart", label: "GDP BAR" },
-            { value: "treemap_percap", label: "GDP/hab TREEMAP" },
-            { value: "barchart_percap", label: "GDP/hab BAR" },
-          ].map((btn) => (
+          {/* Onglets chart type */}
+          {(["treemap", "barchart"] as ChartType[]).map((c) => (
             <button
-              key={btn.value}
-              onClick={() => setGraph(btn.value as any)}
-              className={`graph-btn${graph === btn.value ? " graph-btn--active" : ""}`}
+              key={c}
+              onClick={() => setGraph(c)}
+              className={`graph-btn${graph === c ? " graph-btn--active" : ""}`}
             >
-              {btn.label}
+              {c === "treemap" ? t.treemap : t.barchart}
             </button>
           ))}
+
+          {/* Séparateur visuel */}
+          <span style={{ width: "1px", height: "18px", background: "rgba(255,255,255,0.18)", margin: "0 0.3rem" }} />
+
+          {/* Dropdown métrique */}
+          <select
+            value={metric}
+            onChange={(e) => setMetric(e.target.value as MetricType)}
+            className="select-glass"
+            style={{ cursor: "pointer" }}
+          >
+            {(Object.entries(metricInfo) as [MetricType, { label: string }][]).map(([key, val]) => (
+              <option key={key} value={key}>{val.label}</option>
+            ))}
+          </select>
+
+          {/* Widget de recherche pays */}
+          <div ref={searchRef} className="country-search-wrapper">
+            <div className="country-search-input-row">
+              <input
+                type="text"
+                className="country-search-input select-glass"
+                placeholder={t.searchPlaceholder}
+                value={searchInput}
+                onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  setSearchOpen(true);
+                  if (e.target.value === "") setCountryFocus(null);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {(searchInput || countryFocus) && (
+                <button
+                  className="country-search-clear"
+                  onClick={handleSearchClear}
+                  tabIndex={-1}
+                  aria-label={t.searchClear}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            {searchOpen && filteredCountries.length > 0 && (
+              <ul className="country-search-dropdown">
+                {filteredCountries.slice(0, 40).map((country) => (
+                  <li
+                    key={country}
+                    className={`country-search-item${
+                      countryFocus === country ? " country-search-item--active" : ""
+                    }`}
+                    onMouseDown={() => handleSearchSelect(country)}
+                  >
+                    {country}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* Encart explicatif de la métrique */}
+        <div
+          style={{
+            margin: "0.3rem 1rem 0.1rem",
+            padding: "0.55rem 1rem",
+            borderRadius: "10px",
+            background: "rgba(255,255,255,0.05)",
+            borderLeft: "3px solid rgba(255,255,255,0.25)",
+            color: "rgba(255,255,255,0.75)",
+            fontSize: "0.82rem",
+            lineHeight: 1.5,
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.2rem",
+          }}
+        >
+          <span style={{ fontWeight: 700, color: "#fff", fontSize: "0.88rem" }}>
+            {info.title}
+          </span>
+          <span>{info.description}</span>
+          <span style={{ color: "rgba(255,255,255,0.5)", fontStyle: "italic", fontSize: "0.78rem" }}>
+            {info.example}
+          </span>
         </div>
       </div>
 
-      {/* Content : graph 100% largeur */}
+      {/* Graphe pleine largeur */}
       <div
         className="w-full flex flex-col"
-        style={{
-          flex: 1,
-          minHeight: 0,
-          width: "100vw",
-          padding: 0,
-          display: "flex",
-          flexDirection: "column",
-        }}
+        style={{ flex: 1, minHeight: 0, width: "100vw", padding: 0, display: "flex", flexDirection: "column" }}
       >
         {graph === "treemap" && (
           <AnimatedTreemapGDP
@@ -192,7 +455,7 @@ export default function Home() {
             selectedRegions={selectedRegions}
             setSelectedRegions={setSelectedRegions}
             freeForAll={mode === "ffa"}
-            setFreeForAll={(ffa) => setMode(ffa ? "ffa" : "world")}
+            setFreeForAll={(ffa: boolean) => setMode(ffa ? "ffa" : "world")}
             proportional={proportional}
             setProportional={setProportional}
             mode={mode}
@@ -211,42 +474,9 @@ export default function Home() {
             setCountryFocus={setCountryFocus}
             selectedRegions={selectedRegions}
             setSelectedRegions={setSelectedRegions}
-            isPerCapita={false}
-          />
-        )}
-        {graph === "treemap_percap" && (
-          <AnimatedTreemapGDP
-            data={currentData}
-            years={currentYears}
-            animValue={animValue}
-            playing={playing}
-            setPlaying={setPlaying}
-            onYearChange={handleYearChange}
-            countryFocus={countryFocus}
-            setCountryFocus={setCountryFocus}
-            selectedRegions={selectedRegions}
-            setSelectedRegions={setSelectedRegions}
-            freeForAll={mode === "ffa"}
-            setFreeForAll={(ffa) => setMode(ffa ? "ffa" : "world")}
-            proportional={proportional}
-            setProportional={setProportional}
-            mode={mode}
-          />
-        )}
-        {graph === "barchart_percap" && (
-          <BarChartRace
-            data={currentData}
-            years={currentYears}
-            year={activeYear}
-            animValue={animValue}
-            playing={playing}
-            setPlaying={setPlaying}
-            onYearChange={handleYearChange}
-            countryFocus={countryFocus}
-            setCountryFocus={setCountryFocus}
-            selectedRegions={selectedRegions}
-            setSelectedRegions={setSelectedRegions}
-            isPerCapita={true}
+            isPerCapita={isPerCapita}
+            topN={topN}
+            setTopN={setTopN}
           />
         )}
       </div>

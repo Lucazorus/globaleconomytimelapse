@@ -274,8 +274,8 @@ export default function AnimatedTreemapGDP({
     const y1Clamped = Math.max(years[0], Math.min(years[years.length - 1], y1));
     const y2Clamped = Math.max(years[0], Math.min(years[years.length - 1], y2));
     const PADDING_TOP = 0;
-    const PADDING_INNER = 2;
-    const PADDING_OUTER = 2;
+    const PADDING_INNER = 3;
+    const PADDING_OUTER = 3;
 
     let k1 = 1, k2 = 1;
     if (proportional) {
@@ -431,21 +431,31 @@ export default function AnimatedTreemapGDP({
       regionFontSizeMap[r.name] = r.fontSize;
     }
 
+    // Définition defs pour clip et filtre ombre
+    const defs = svg.append("defs");
+
     const group = svg.append("g").attr("class", "treemap");
     group
       .selectAll("g")
       .data(nodes, (d) => d.region + "|" + d.country)
       .join("g")
-      .attr("transform", (d) => `translate(${d.x0},${d.y0})`)
+      .attr("transform", (d) => `translate(${Math.round(d.x0)},${Math.round(d.y0)})`)
       .each(function (d) {
         const g = d3.select(this);
         const isFocused = countryFocus && d.country === countryFocus;
+        const w = Math.max(0, Math.round(d.x1 - d.x0));
+        const h = Math.max(0, Math.round(d.y1 - d.y0));
+        const baseColor = isFocused ? "#FA003F" : regionColors(d.region);
+
+        // Rect principal
         g.append("rect")
-          .attr("width", d.x1 - d.x0)
-          .attr("height", d.y1 - d.y0)
-          .attr("fill", isFocused ? "#FA003F" : regionColors(d.region))
+          .attr("width", w)
+          .attr("height", h)
+          .attr("fill", baseColor)
+          .attr("stroke", isFocused ? "#FF4D7D" : "rgba(255,255,255,0.10)")
+          .attr("stroke-width", isFocused ? 2 : 1)
           .attr("cursor", "pointer")
-          .on("click", function (event) {
+          .on("click", function () {
             handleCountryFocus(d.country);
           })
           .on("mousemove", function (event) {
@@ -462,36 +472,61 @@ export default function AnimatedTreemapGDP({
             setTooltip((tt) => tt.show ? { ...tt, show: false } : tt);
           });
 
-        const area = (d.x1 - d.x0) * (d.y1 - d.y0);
+        // Overlay gradient pour profondeur (seulement si assez grand)
+        if (w > 20 && h > 20) {
+          const gradId = `grad-${(d.region + d.country).replace(/[^a-zA-Z0-9]/g, "_")}`;
+          const grad = defs.append("linearGradient")
+            .attr("id", gradId)
+            .attr("x1", "0%").attr("y1", "0%")
+            .attr("x2", "0%").attr("y2", "100%");
+          grad.append("stop").attr("offset", "0%").attr("stop-color", "rgba(255,255,255,0.12)");
+          grad.append("stop").attr("offset", "100%").attr("stop-color", "rgba(0,0,0,0.12)");
+
+          g.append("rect")
+            .attr("width", w)
+            .attr("height", h)
+            .attr("fill", `url(#${gradId})`)
+            .attr("pointer-events", "none");
+        }
+
+        const area = w * h;
         const maxFont = regionFontSizeMap[d.region] || 22;
         const fontSize = getFontSize(area, maxFont);
 
-        // Police MINI pour labels pays
-        if (d.x1 - d.x0 > 30 && d.y1 - d.y0 > 15) {
-          g.append("text")
-            .attr("x", 3)
-            .attr("y", fontSize + 1)
-            .attr("font-size", Math.max(3, fontSize * 0.85)) // <---- ici on autorise petit
+        // Labels pays
+        if (w > 28 && h > 14) {
+          const labelGroup = g.append("g")
+            .attr("pointer-events", "none");
+
+          // Nom du pays
+          const nameFontSize = Math.max(3, fontSize * 0.85);
+          labelGroup.append("text")
+            .attr("x", 5)
+            .attr("y", nameFontSize + 3)
+            .attr("font-size", nameFontSize)
             .attr("font-family", "Inter, Arial, sans-serif")
             .attr("fill", "#fff")
-            .attr("font-weight", 300)
-            .attr("letter-spacing", "-0.01em")
-            .attr("pointer-events", "none")
+            .attr("fill-opacity", isFocused ? 1 : 0.92)
+            .attr("font-weight", isFocused ? 600 : 400)
+            .attr("letter-spacing", nameFontSize > 9 ? "0.02em" : "0em")
             .text(
               d.country.length < 18
                 ? d.country.toUpperCase()
                 : d.country.slice(0, 17).toUpperCase() + "…"
             );
-          if (d.value) {
-            g.append("text")
-              .attr("x", 3)
-              .attr("y", fontSize * 2 + 2)
-              .attr("font-size", Math.max(3, fontSize * 0.70)) // <--- pareil ici
+
+          // Valeur GDP (seulement si assez de place)
+          if (d.value && h > nameFontSize * 2.5) {
+            const valFontSize = Math.max(3, fontSize * 0.70);
+            labelGroup.append("text")
+              .attr("x", 5)
+              .attr("y", nameFontSize + valFontSize + 5)
+              .attr("font-size", valFontSize)
               .attr("font-family", "Inter, Arial, sans-serif")
               .attr("fill", "#fff")
+              .attr("fill-opacity", isFocused ? 0.95 : 0.72)
               .attr("font-weight", 300)
-              .attr("letter-spacing", "0.08em")
-              .attr("pointer-events", "none")
+              .attr("letter-spacing", "0.04em")
               .text(formatValue(d.value));
           }
         }
@@ -563,42 +598,60 @@ export default function AnimatedTreemapGDP({
           style={{
             position: "fixed",
             pointerEvents: "none",
-            top: tooltip.y - 70,
-            left: tooltip.x - 100,
-            background: "rgba(22,28,40,0.97)",
+            top: tooltip.y - 80,
+            left: tooltip.x + 12,
+            background: "rgba(15,22,30,0.97)",
             color: "#fff",
-            borderRadius: 10,
-            padding: "11px 18px",
-            minWidth: 120,
+            borderRadius: 12,
+            padding: "10px 16px 10px 14px",
+            minWidth: 140,
             zIndex: 1001,
-            boxShadow: "0 4px 24px #1116",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.08)",
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-start",
             fontFamily: "Inter, Arial, sans-serif",
+            backdropFilter: "blur(8px)",
           }}
           onMouseMove={touchTooltip}
         >
+          {/* Badge région */}
+          <span style={{
+            fontSize: 10,
+            fontWeight: 500,
+            letterSpacing: "0.10em",
+            textTransform: "uppercase",
+            color: regionColors(
+              (data.find((d: any) => d.country === tooltip.name)?.region) || ""
+            ),
+            marginBottom: 4,
+            opacity: 0.9,
+          }}>
+            {data.find((d: any) => d.country === tooltip.name)?.region || ""}
+          </span>
           <span
             style={{
-              fontWeight: 400,
-              fontSize: 17,
+              fontWeight: 500,
+              fontSize: 15,
               textTransform: "uppercase",
-              letterSpacing: "0.01em",
-              marginBottom: 2,
-              lineHeight: 1.1,
+              letterSpacing: "0.04em",
+              marginBottom: 4,
+              lineHeight: 1.2,
               whiteSpace: "nowrap",
+              color: "#fff",
             }}
           >
             {tooltip.name}
           </span>
           <span
             style={{
-              fontWeight: 400,
-              fontSize: 15,
-              opacity: 0.93,
+              fontWeight: 300,
+              fontSize: 14,
+              opacity: 0.85,
               whiteSpace: "nowrap",
-              lineHeight: 1.18,
+              lineHeight: 1.2,
+              color: "#a8d8ea",
+              letterSpacing: "0.02em",
             }}
           >
             {tooltip.value !== null ? formatValue(tooltip.value) : "—"}

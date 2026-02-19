@@ -3,6 +3,8 @@ import React, { ReactNode, useState, useEffect } from "react";
 import Script from "next/script";
 import { Inter } from "next/font/google";
 import { useRive, Layout as RiveLayout, Fit, Alignment } from "@rive-app/react-canvas";
+import { useLang } from "../lib/LangContext";
+import type { Lang } from "../lib/i18n";
 const inter = Inter({ subsets: ["latin"] });
 
 // Hook custom pour récupérer la largeur de la fenêtre
@@ -65,9 +67,15 @@ function LogoHeader() {
   );
 }
 
+const LANGS: { code: Lang; flag: string; label: string }[] = [
+  { code: "fr", flag: "🇫🇷", label: "FR" },
+  { code: "en", flag: "🇬🇧", label: "EN" },
+];
+
 const Layout = ({ children, title }: LayoutProps) => {
   const width = useWindowWidth();
   const isMobile = width <= 600;
+  const { lang, setLang } = useLang();
 
   return (
     <>
@@ -101,8 +109,9 @@ const Layout = ({ children, title }: LayoutProps) => {
             <title>{title}</title>
           </head>
         )}
-        <header style={{ flexShrink: 0 }}>
-          <div style={{ display: "inline-flex", alignItems: "stretch", background: "#1a2327", padding: "8px 24px 0 24px" }}>
+        <header style={{ flexShrink: 0, background: "#1a2327", padding: "8px 24px 0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          {/* Logo + titre */}
+          <div style={{ display: "inline-flex", alignItems: "stretch" }}>
             <LogoHeader />
             <span
               style={{
@@ -116,13 +125,37 @@ const Layout = ({ children, title }: LayoutProps) => {
                 whiteSpace: "nowrap",
                 letterSpacing: "0.05em",
                 textTransform: "uppercase",
-                maxWidth: isMobile ? "calc(100vw - 90px)" : undefined,
+                maxWidth: isMobile ? "calc(100vw - 150px)" : undefined,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
               }}
             >
               Global Economy Timelapse
             </span>
+          </div>
+
+          {/* Toggle langue */}
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            {LANGS.map(({ code, flag, label }) => (
+              <button
+                key={code}
+                onClick={() => setLang(code)}
+                style={{
+                  background: lang === code ? "rgba(255,255,255,0.15)" : "transparent",
+                  border: lang === code ? "1px solid rgba(255,255,255,0.3)" : "1px solid transparent",
+                  borderRadius: 6,
+                  color: lang === code ? "#fff" : "rgba(255,255,255,0.45)",
+                  fontSize: isMobile ? 11 : 13,
+                  padding: isMobile ? "2px 5px" : "3px 8px",
+                  cursor: "pointer",
+                  lineHeight: "20px",
+                  transition: "all 0.15s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {flag} {!isMobile && label}
+              </button>
+            ))}
           </div>
         </header>
         <main

@@ -10,10 +10,7 @@ function formatNumberSpace(num) {
   return num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
-const margin = { top: 40, right: 40, bottom: 60, left: 40 };
-const barHeight = 32;
-const barPadding = 8;
-const topN = 20;
+const margin = { top: 40, right: 40, bottom: 20, left: 40 };
 const MIN_BAR_LABEL_WIDTH = 100;
 
 interface CountryData {
@@ -37,6 +34,8 @@ interface BarChartRaceProps {
   selectedRegions: string[] | null;
   setSelectedRegions: React.Dispatch<React.SetStateAction<string[] | null>>;
   isPerCapita?: boolean;
+  topN: number;
+  setTopN: (v: number) => void;
 }
 
 export default function BarChartRace({
@@ -52,10 +51,13 @@ export default function BarChartRace({
   selectedRegions,
   setSelectedRegions,
   isPerCapita = false,
+  topN,
+  setTopN,
 }: BarChartRaceProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const sliderRef = useRef<HTMLInputElement | null>(null);
+  const topNSliderRef = useRef<HTMLInputElement | null>(null);
 
   // Responsive container
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
@@ -65,11 +67,7 @@ export default function BarChartRace({
       const width = containerRef.current.offsetWidth || 1200;
       const totalHeight = containerRef.current.offsetHeight || 600;
       const controlsHeight = 185;
-      const height = Math.max(
-        320,
-        totalHeight - controlsHeight,
-        topN * (barHeight + barPadding) + margin.top + margin.bottom
-      );
+      const height = Math.max(120, totalHeight - controlsHeight);
       setContainerSize({
         width: Math.max(360, width),
         height: Math.round(height),
@@ -86,6 +84,19 @@ export default function BarChartRace({
   }, []);
   const width = containerSize.width;
   const height = containerSize.height;
+
+  // barHeight calculé dynamiquement pour remplir exactement l'espace disponible
+  const chartHeight = height - margin.top - margin.bottom;
+  const barPadding = Math.max(2, Math.floor(chartHeight / topN * 0.18));
+  const barHeight = Math.max(4, Math.floor((chartHeight - barPadding * (topN - 1)) / topN));
+
+  // Gradient du slider topN
+  useEffect(() => {
+    const el = topNSliderRef.current;
+    if (!el) return;
+    const percent = ((topN - 3) / (30 - 3)) * 100;
+    el.style.setProperty("--progress", `${percent}%`);
+  }, [topN]);
 
   // Région - logique AnimatedTreemap
   const regionListClean = REGION_LIST.filter(r => r !== "Other");
@@ -182,9 +193,9 @@ export default function BarChartRace({
           d.region && d.region !== "Other" &&
           regionsArray.includes(d.region)
       );
+      // Ne pas couper ici : on garde tous les pays pour pouvoir centrer sur le pays focusé
       const sorted = yearData
         .sort((a, b) => b.gdp - a.gdp)
-        .slice(0, topN)
         .map((d, i) => ({ ...d, rank: i }));
       const maxValue = Math.max(0, ...sorted.map((d) => d.gdp));
       return [yearVal, sorted, maxValue] as [number, CountryData[], number];
@@ -200,11 +211,22 @@ export default function BarChartRace({
       else
         mergedCountries.set(d.country, { ...d, gdp1: 0, gdp2: d.gdp });
     }
-    const interpTop = Array.from(mergedCountries.values())
+    const allSorted = Array.from(mergedCountries.values())
       .map((d) => ({ ...d, gdp: d.gdp1 * (1 - t) + d.gdp2 * t }))
       .filter((d) => d.gdp > 0)
-      .sort((a, b) => b.gdp - a.gdp)
-      .slice(0, topN);
+      .sort((a, b) => b.gdp - a.gdp);
+
+    // Fenêtre glissante : centrer sur le pays focusé
+    const focusedRank = countryFocus
+      ? allSorted.findIndex((d) => d.country === countryFocus)
+      : -1;
+    let windowStart = 0;
+    if (focusedRank >= 0) {
+      const ideal = focusedRank - Math.floor(topN / 2);
+      const maxStart = Math.max(0, allSorted.length - topN);
+      windowStart = Math.max(0, Math.min(ideal, maxStart));
+    }
+    const interpTop = allSorted.slice(windowStart, windowStart + topN);
 
     // GDP du pays focus à afficher (live) — même s’il n’est pas dans le topN
     if (countryFocus) {
@@ -257,7 +279,9 @@ export default function BarChartRace({
 
     // ----- RENDER D3 -----
     const interpMax = Math.max(...interpTop.map((d) => d.gdp), 1);
-    const x = d3.scaleLinear().range([margin.left, width - margin.right]);
+    const rankColWidth = 32;
+    const chartLeft = margin.left + rankColWidth;
+    const x = d3.scaleLinear().range([chartLeft, width - margin.right]);
     const y = (_d: any, i: number) => margin.top + i * (barHeight + barPadding);
     x.domain([0, interpMax * 1.08]);
     const svg = d3
@@ -267,7 +291,19 @@ export default function BarChartRace({
       .attr("height", height);
     svg.selectAll("*").remove();
 
-    // Bars
+    // Lignes de grille verticales subtiles
+    const tickValues = x.ticks(5);
+    tickValues.forEach((tickVal) => {
+      const xPos = x(tickVal);
+      svg.append("line")
+        .attr("x1", xPos).attr("x2", xPos)
+        .attr("y1", margin.top)
+        .attr("y2", margin.top + interpTop.length * (barHeight + barPadding))
+        .attr("stroke", "rgba(255,255,255,0.05)")
+        .attr("stroke-width", 1);
+    });
+
+    // Bars (track vide + barre remplie)
     svg
       .selectAll("g.bar")
       .data(interpTop, (d: any) => d.country)
@@ -275,25 +311,46 @@ export default function BarChartRace({
         (enter: any) => {
           const g = enter.append("g").attr("class", "bar");
           g.attr("transform", (_d: any, i: number) => `translate(0,${y(_d, i)})`);
+
+          // Track (fond de barre vide)
           g.append("rect")
-            .attr("x", margin.left)
+            .attr("class", "bar-track")
+            .attr("x", chartLeft)
             .attr("y", 0)
             .attr("height", barHeight)
-            .attr("width", (d: any) => x(d.gdp) - margin.left)
+            .attr("width", width - margin.right - chartLeft)
+            .attr("fill", "rgba(255,255,255,0.04)");
+
+          // Barre remplie
+          g.append("rect")
+            .attr("class", "bar-fill")
+            .attr("x", chartLeft)
+            .attr("y", 0)
+            .attr("height", barHeight)
+            .attr("width", (d: any) => Math.max(0, x(d.gdp) - chartLeft))
             .attr("fill", (d: any) =>
               countryFocus && d.country === countryFocus
                 ? "#FA003F"
                 : regionColors(d.region)
             )
-            .attr("rx", 2)
             .attr("cursor", "pointer")
             .on("click", (_e: any, d: any) => setCountryFocus(d.country));
+
+          // Overlay gradient sur la barre
+          g.append("rect")
+            .attr("class", "bar-shine")
+            .attr("x", chartLeft)
+            .attr("y", 0)
+            .attr("height", barHeight / 2)
+            .attr("width", (d: any) => Math.max(0, x(d.gdp) - chartLeft))
+            .attr("fill", "rgba(255,255,255,0.06)")
+            .attr("pointer-events", "none");
+
           return g;
         },
         (update: any) => {
           update.attr("transform", (_d: any, i: number) => `translate(0,${y(_d, i)})`);
-          update
-            .select("rect")
+          update.select("rect.bar-fill")
             .attr("fill", (d: any) =>
               countryFocus && d.country === countryFocus
                 ? "#FA003F"
@@ -304,8 +361,8 @@ export default function BarChartRace({
         },
         (exit: any) => exit.remove()
       )
-      .select("rect")
-      .attr("width", (d: any) => x(d.gdp) - margin.left)
+      .select("rect.bar-fill")
+      .attr("width", (d: any) => Math.max(0, x(d.gdp) - chartLeft))
       .attr("fill", (d: any) =>
         countryFocus && d.country === countryFocus
           ? "#FA003F"
@@ -313,76 +370,113 @@ export default function BarChartRace({
       )
       .on("click", (_e: any, d: any) => setCountryFocus(d.country));
 
+    // Aussi mettre à jour la largeur du shine
+    svg.selectAll("g.bar").each(function(d: any) {
+      d3.select(this).select("rect.bar-shine")
+        .attr("width", Math.max(0, x(d.gdp) - chartLeft));
+    });
+
     // Labels
     svg.selectAll("text.country-label").remove();
     svg.selectAll("text.value-label").remove();
+    svg.selectAll("text.rank-label").remove();
+
     interpTop.forEach((d: any, i: number) => {
-      const barLen = x(d.gdp) - margin.left;
+      const barLen = Math.max(0, x(d.gdp) - chartLeft);
+      const isFocused = countryFocus && d.country === countryFocus;
+      const yMid = y(d, i) + barHeight / 2 + 5;
+
+      // Taille de police adaptée à la hauteur de barre
+      const fs = Math.max(7, Math.min(14, barHeight * 0.55));
+      const fsRank = Math.max(6, Math.min(11, barHeight * 0.42));
+
+      // Numéro de rang
+      svg.append("text")
+        .attr("class", "rank-label")
+        .attr("x", margin.left + rankColWidth - 6)
+        .attr("y", yMid)
+        .attr("font-size", fsRank)
+        .attr("fill", isFocused ? "#FA003F" : "rgba(255,255,255,0.35)")
+        .attr("font-family", "Inter, Arial, sans-serif")
+        .attr("font-weight", 600)
+        .attr("text-anchor", "end")
+        .attr("pointer-events", "none")
+        .text(windowStart + i + 1);
+
       let countryX, valueX, anchor;
-      let showOutside = barLen < MIN_BAR_LABEL_WIDTH;
+      const showOutside = barLen < MIN_BAR_LABEL_WIDTH;
       if (!showOutside) {
-        countryX = x(d.gdp) - 14;
-        valueX = x(d.gdp) + 18;
+        countryX = x(d.gdp) - 10;
+        valueX = x(d.gdp) + 10;
         anchor = "end";
       } else {
         countryX = x(d.gdp) + 8;
-        valueX = x(d.gdp) + 24 + d.country.length * 10;
+        valueX = x(d.gdp) + 8 + d.country.length * fs * 0.65 + 8;
         anchor = "start";
       }
+
+      // Nom du pays
       svg.append("text")
         .attr("class", "country-label")
         .attr("x", countryX)
-        .attr("y", y(d, i) + barHeight / 2 + 4)
-        .attr("font-size", 15)
+        .attr("y", yMid)
+        .attr("font-size", fs)
         .attr("fill", "#fff")
+        .attr("fill-opacity", isFocused ? 1 : 0.90)
         .attr("font-family", "Inter, Arial, sans-serif")
-        .attr("font-weight", 300)
-        .attr("letter-spacing", "0.06em")
+        .attr("font-weight", isFocused ? 600 : 400)
+        .attr("letter-spacing", "0.04em")
         .attr("text-anchor", anchor)
         .attr("cursor", "pointer")
-        .attr("text-transform", "uppercase")
         .text(
           d.country.length < 20
             ? d.country.toUpperCase()
             : d.country.slice(0, 19).toUpperCase() + "…"
         )
         .on("click", () => setCountryFocus(d.country));
-      let valueLabel = isPerCapita
+
+      // Valeur GDP
+      const valueLabel = isPerCapita
         ? `$${formatNumberSpace(d.gdp)}`
         : `$${formatNumberSpace(Math.round(d.gdp / 1e9))}B`;
       svg.append("text")
         .attr("class", "value-label")
         .attr("x", valueX)
-        .attr("y", y(d, i) + barHeight / 2 + 4)
-        .attr("font-size", 17)
-        .attr("fill", "#fff")
-        .attr("opacity", 0.95)
+        .attr("y", yMid)
+        .attr("font-size", fs)
+        .attr("fill", isFocused ? "#FF8FAB" : "#a8d8ea")
+        .attr("fill-opacity", 0.90)
         .attr("font-family", "Inter, Arial, sans-serif")
-        .attr("font-weight", 300)
-        .attr("letter-spacing", "0.04em")
+        .attr("font-weight", 500)
+        .attr("letter-spacing", "0.03em")
         .attr("text-anchor", "start")
-        .attr("text-transform", "uppercase")
         .attr("cursor", "pointer")
         .text(valueLabel)
         .on("click", () => setCountryFocus(d.country));
     });
 
-    // Axe X
-    svg.append("g")
+    // Axe X (lignes de grille + labels en haut)
+    const axisG = svg.append("g")
       .attr("class", "x-axis")
-      .attr("transform", `translate(0,${margin.top - 10})`)
-      .call(
-        d3.axisTop(x)
-          .ticks(5)
-          .tickFormat(d => isPerCapita
-            ? `$${formatNumberSpace(Number(d))}`
-            : `$${formatNumberSpace(Math.round(Number(d) / 1e9))}B`
-          )
-      )
-      .selectAll("text")
-      .attr("font-size", 14)
-      .attr("fill", "#fff")
-      .attr("font-family", "Inter, sans-serif");
+      .attr("transform", `translate(0,${margin.top - 8})`);
+
+    axisG.call(
+      d3.axisTop(x)
+        .tickValues(tickValues)
+        .tickFormat(d => isPerCapita
+          ? `$${formatNumberSpace(Number(d))}`
+          : `$${formatNumberSpace(Math.round(Number(d) / 1e9))}B`
+        )
+        .tickSize(0)
+    );
+
+    axisG.select(".domain").remove();
+    axisG.selectAll("text")
+      .attr("font-size", 11)
+      .attr("fill", "rgba(255,255,255,0.35)")
+      .attr("font-family", "Inter, sans-serif")
+      .attr("font-weight", 400)
+      .attr("dy", "-0.4em");
   }, [
     animValue,
     selectedRegions,
@@ -393,6 +487,9 @@ export default function BarChartRace({
     width,
     height,
     playing,
+    topN,
+    barHeight,
+    barPadding,
   ]);
 
   function handlePlayPause() {
@@ -485,7 +582,7 @@ export default function BarChartRace({
         className="center-controls-wrapper flex items-center gap-4 w-full"
         style={{
           minWidth: 300,
-          maxWidth: 1280,
+          maxWidth: 1400,
           margin: "0 auto",
           padding: "6px 0",
           fontSize: 13,
@@ -528,6 +625,41 @@ export default function BarChartRace({
               </option>
             ))}
           </select>
+        </div>
+        {/* Slider nombre de pays */}
+        <div className="flex flex-row items-center gap-2 ml-2" style={{ minWidth: 130 }}>
+          <span style={{
+            fontSize: 11,
+            color: "rgba(255,255,255,0.45)",
+            fontFamily: "Inter, Arial, sans-serif",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+            userSelect: "none",
+          }}>
+            Top
+          </span>
+          <input
+            ref={topNSliderRef}
+            type="range"
+            min={3}
+            max={30}
+            step={1}
+            value={topN}
+            onChange={(e) => setTopN(Number(e.target.value))}
+            style={{ width: 70, height: 5 }}
+          />
+          <span style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: "#fff",
+            fontFamily: "Inter, Arial, sans-serif",
+            minWidth: 22,
+            textAlign: "left",
+            userSelect: "none",
+          }}>
+            {topN}
+          </span>
         </div>
         {/* Focus Country + PIB + Clear (style TreeMap) */}
         <div className="flex flex-row items-center min-w-[250px] ml-2" style={{ marginTop: 0 }}>
@@ -597,8 +729,8 @@ export default function BarChartRace({
       </div>
       {/* SVG */}
       <div
-        className="w-full overflow-x-auto"
-        style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}
+        className="w-full"
+        style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "auto" }}
       >
         <svg
           ref={svgRef}
@@ -609,7 +741,6 @@ export default function BarChartRace({
             minWidth: 360,
             minHeight: 320,
             maxWidth: "100%",
-            maxHeight: "100%",
           }}
         ></svg>
       </div>

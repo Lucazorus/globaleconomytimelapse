@@ -324,3 +324,132 @@ button:focus {
   border-radius: 1rem;
   box-shadow: 0 4px 32px #0002;
 }
+
+/* === COUNTRY SEARCH WIDGET === */
+.country-search-wrapper {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 160px;
+  max-width: 220px;
+  margin: 0.10rem 0.19rem;
+  z-index: 200;
+}
+
+.country-search-input-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.country-search-input {
+  width: 100%;
+  padding-right: 1.8rem !important;
+  font-size: 0.85rem;
+  cursor: text;
+}
+
+.country-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 300;
+}
+
+.country-search-input:focus {
+  box-shadow: 0 2px 16px #719CAFcc, 0 0 0 2.5px #719CAFbb;
+  background: rgba(255, 255, 255, 0.17);
+  outline: none;
+}
+
+.country-search-clear {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.country-search-clear:hover {
+  color: #fff;
+}
+
+.country-search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: rgba(26, 35, 39, 0.97);
+  border: 1px solid rgba(113, 156, 175, 0.35);
+  border-radius: 0.75rem;
+  backdrop-filter: blur(12px) saturate(1.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  max-height: 220px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  z-index: 300;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(113, 156, 175, 0.4) transparent;
+}
+
+.country-search-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.country-search-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(113, 156, 175, 0.4);
+  border-radius: 4px;
+}
+
+.country-search-item {
+  padding: 0.32rem 0.85rem;
+  font-size: 0.80rem;
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 300;
+  color: #e9eef4;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.country-search-item:hover {
+  background: rgba(113, 156, 175, 0.18);
+  color: #fff;
+}
+
+.country-search-item--active {
+  background: rgba(250, 0, 63, 0.18);
+  color: #FA003F;
+  font-weight: 500;
+}
+
+.country-search-item--active:hover {
+  background: rgba(250, 0, 63, 0.28);
+}
+
+@media (max-width: 900px) {
+  .country-search-wrapper {
+    min-width: 120px;
+    max-width: 170px;
+  }
+  .country-search-input {
+    font-size: 0.77rem;
+  }
+  .country-search-item {
+    font-size: 0.73rem;
+  }
+}
