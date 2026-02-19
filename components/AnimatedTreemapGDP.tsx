@@ -718,7 +718,34 @@ export default function AnimatedTreemapGDP({
           lineHeight: "1.2",
         }}
       >
-        <div className="shrink-0 flex items-center">
+        {/* Année + Métrique + Play groupés à gauche */}
+        <div className="shrink-0 flex items-center gap-2">
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", lineHeight: 1, minWidth: 60 }}>
+            <span style={{
+              fontSize: "1.6rem",
+              fontWeight: 800,
+              color: "rgba(255,255,255,0.85)",
+              fontFamily: "Inter, Arial, sans-serif",
+              letterSpacing: "-0.02em",
+              lineHeight: 1,
+            }}>
+              {Math.round(animValue)}
+            </span>
+            {metricLabel && (
+              <span style={{
+                fontSize: "0.6rem",
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.35)",
+                fontFamily: "Inter, Arial, sans-serif",
+                letterSpacing: "0.07em",
+                textTransform: "uppercase",
+                marginTop: 2,
+                lineHeight: 1,
+              }}>
+                {metricLabel}
+              </span>
+            )}
+          </div>
           <PlayPauseButton
             playing={playing}
             onClick={handlePlayPause}
@@ -846,44 +873,9 @@ export default function AnimatedTreemapGDP({
       {/* SVG */}
       <div
         className="w-full overflow-x-auto"
-        style={{ flex: 1, minHeight: 0, alignItems: "stretch", position: "relative" }}
+        style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}
         onMouseLeave={() => setTooltip((tt) => tt.show ? { ...tt, show: false } : tt)}
       >
-        {/* Overlay année + métrique */}
-        <div
-          style={{
-            position: "absolute",
-            top: 12,
-            left: 16,
-            zIndex: 10,
-            pointerEvents: "none",
-            lineHeight: 1,
-          }}
-        >
-          <div style={{
-            fontSize: "clamp(2.5rem, 6vw, 5rem)",
-            fontWeight: 800,
-            color: "rgba(255,255,255,0.12)",
-            fontFamily: "Inter, Arial, sans-serif",
-            letterSpacing: "-0.02em",
-            lineHeight: 1,
-          }}>
-            {Math.round(animValue)}
-          </div>
-          {metricLabel && (
-            <div style={{
-              fontSize: "clamp(0.65rem, 1.2vw, 0.9rem)",
-              fontWeight: 600,
-              color: "rgba(255,255,255,0.25)",
-              fontFamily: "Inter, Arial, sans-serif",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              marginTop: 2,
-            }}>
-              {metricLabel}
-            </div>
-          )}
-        </div>
         <svg
           ref={svgRef}
           width={width}
