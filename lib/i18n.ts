@@ -79,4 +79,4 @@ export const TRANSLATIONS = {
   },
 } as const;
 
-export type Translations = typeof TRANSLATIONS["fr"];
+export type Translations = typeof TRANSLATIONS[Lang];
