@@ -418,30 +418,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Encart explicatif de la métrique */}
-        <div
-          style={{
-            margin: "0.3rem 1rem 0.1rem",
-            padding: "0.55rem 1rem",
-            borderRadius: "10px",
-            background: "rgba(255,255,255,0.05)",
-            borderLeft: "3px solid rgba(255,255,255,0.25)",
-            color: "rgba(255,255,255,0.75)",
-            fontSize: "0.82rem",
-            lineHeight: 1.5,
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.2rem",
-          }}
-        >
-          <span style={{ fontWeight: 700, color: "#fff", fontSize: "0.88rem" }}>
-            {info.title}
-          </span>
-          <span>{info.description}</span>
-          <span style={{ color: "rgba(255,255,255,0.5)", fontStyle: "italic", fontSize: "0.78rem" }}>
-            {info.example}
-          </span>
-        </div>
       </div>
 
       {/* Graphe pleine largeur */}
@@ -488,6 +464,22 @@ export default function Home() {
             metricLabel={info.label}
           />
         )}
+      </div>
+
+      {/* Encart explicatif compact sous le graphe */}
+      <div style={{
+        padding: "0.3rem 1.2rem 0.4rem",
+        color: "rgba(255,255,255,0.38)",
+        fontSize: "0.7rem",
+        lineHeight: 1.4,
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "0 0.5rem",
+        alignItems: "baseline",
+      }}>
+        <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>{info.title} —</span>
+        <span>{info.description}</span>
+        <span style={{ fontStyle: "italic", opacity: 0.7 }}>{info.example}</span>
       </div>
     </div>
   );
