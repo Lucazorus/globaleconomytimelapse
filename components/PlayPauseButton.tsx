@@ -24,16 +24,12 @@ export default function PlayPauseButton({ playing, onClick, size = 48, disabled 
         height: size,
         minWidth: size,
         minHeight: size,
-        background: playing
-          ? "linear-gradient(135deg, #4DB882 0%, #3a9e6e 100%)"
-          : "linear-gradient(135deg, #3a6eaf 0%, #2a5280 100%)",
+        background: "transparent",
         color: "#fff",
         border: "none",
-        boxShadow: playing
-          ? "0 0 18px rgba(77,184,130,0.45), 0 4px 12px rgba(0,0,0,0.3)"
-          : "0 0 14px rgba(91,143,212,0.35), 0 4px 12px rgba(0,0,0,0.3)",
+        boxShadow: "none",
         cursor: disabled ? "not-allowed" : "pointer",
-        transition: "background 0.25s, box-shadow 0.25s",
+        transition: "opacity 0.2s",
       }}
       tabIndex={0}
     >
@@ -46,7 +42,7 @@ export default function PlayPauseButton({ playing, onClick, size = 48, disabled 
         {/* Triangle Play */}
         <polygon
           points="18,12 35,22 18,32"
-          fill="#fff"
+          fill="#4DB882"
           opacity={playing ? 0 : 1}
           style={{ transition: "opacity 0.2s" }}
         />
@@ -55,7 +51,7 @@ export default function PlayPauseButton({ playing, onClick, size = 48, disabled 
           x="15" y="13"
           width="5" height="18"
           rx="2.5"
-          fill="#fff"
+          fill="rgba(255,255,255,0.75)"
           opacity={playing ? 1 : 0}
           style={{ transition: "opacity 0.2s" }}
         />
@@ -63,7 +59,7 @@ export default function PlayPauseButton({ playing, onClick, size = 48, disabled 
           x="24" y="13"
           width="5" height="18"
           rx="2.5"
-          fill="#fff"
+          fill="rgba(255,255,255,0.75)"
           opacity={playing ? 1 : 0}
           style={{ transition: "opacity 0.2s" }}
         />

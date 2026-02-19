@@ -56,8 +56,8 @@ function parseRegions(val: string | string[] | undefined): string[] | null {
 }
 
 function parseProportional(val: string | string[] | undefined): boolean {
-  if (val === "false") return false;
-  return true;
+  if (val === "true") return true;
+  return false;
 }
 
 function parseYear(val: string | string[] | undefined): number | null {
@@ -79,6 +79,8 @@ export default function Home() {
   const urlInitialized = useRef(false);
   // Année issue de l'URL, en attente que les données soient chargées
   const pendingUrlYear = useRef<number | null>(null);
+  // Auto-play au premier chargement (une seule fois)
+  const hasAutoPlayed = useRef(false);
 
   const [data, setData] = useState<any[]>([]);
   const [years, setYears] = useState<number[]>([]);
@@ -95,7 +97,7 @@ export default function Home() {
   const [countryFocus, setCountryFocus] = useState<string | null>(null);
   const [mode, setMode] = useState<"world" | "ffa">("world");
   const [selectedRegions, setSelectedRegions] = useState<null | string[]>(null);
-  const [proportional, setProportional] = useState(true);
+  const [proportional, setProportional] = useState(false);
   const [topN, setTopN] = useState(20);
 
   // --- Étape 1 : Lecture URL au mount (une seule fois) ---
@@ -134,6 +136,11 @@ export default function Home() {
               : yearsArr[0];
           setActiveYear(targetYear);
           setAnimValue(targetYear);
+          // Auto-play dès le premier chargement
+          if (!hasAutoPlayed.current) {
+            hasAutoPlayed.current = true;
+            setTimeout(() => setPlaying(true), 300);
+          }
         }
       });
     // eslint-disable-next-line
