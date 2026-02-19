@@ -360,17 +360,16 @@ export default function Home() {
           {/* Séparateur visuel */}
           <span style={{ width: "1px", height: "18px", background: "rgba(255,255,255,0.18)", margin: "0 0.3rem" }} />
 
-          {/* Dropdown métrique */}
-          <select
-            value={metric}
-            onChange={(e) => setMetric(e.target.value as MetricType)}
-            className="select-glass"
-            style={{ cursor: "pointer" }}
-          >
-            {(Object.entries(metricInfo) as [MetricType, { label: string }][]).map(([key, val]) => (
-              <option key={key} value={key}>{val.label}</option>
-            ))}
-          </select>
+          {/* Boutons métrique — même style que les onglets chart */}
+          {(Object.entries(metricInfo) as [MetricType, { label: string }][]).map(([key, val]) => (
+            <button
+              key={key}
+              onClick={() => setMetric(key)}
+              className={`graph-btn${metric === key ? " graph-btn--active" : ""}`}
+            >
+              {val.label}
+            </button>
+          ))}
 
           {/* Widget de recherche pays */}
           <div ref={searchRef} className="country-search-wrapper">
