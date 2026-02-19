@@ -690,21 +690,21 @@ export default function BarChartRace({
             {topN}
           </span>
         </div>
-        {/* Focus Country + PIB + Clear (style TreeMap) */}
-        <div className="flex flex-row items-center min-w-[250px] ml-2" style={{ marginTop: 0 }}>
-          <select
-            value={countryFocus ?? ""}
-            onChange={(e) => setCountryFocus(e.target.value || null)}
-            className="select-glass px-2 py-1 min-w-[100px]"
-            style={{ fontSize: 14, padding: "2px 8px" }}
+        {/* Focus Country : GDP + Clear (le select est en haut dans la barre globale) */}
+        {countryFocus && (
+        <div className="flex flex-row items-center ml-2" style={{ marginTop: 0 }}>
+          <span
+            className="text-white text-xs select-none"
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: "rgba(255,255,255,0.7)",
+              fontFamily: "Inter, Arial, sans-serif",
+              marginRight: 4,
+            }}
           >
-            <option value="">Focused Country</option>
-            {countryList.map((country) => (
-              <option key={country} value={country}>
-                {country}
-              </option>
-            ))}
-          </select>
+            {countryFocus}
+          </span>
           {countryFocus && (
             <span
               className="text-white text-xs select-none"
@@ -729,32 +729,28 @@ export default function BarChartRace({
               {focusGDP || "—"}
             </span>
           )}
-          {countryFocus && (
-            <button
-              onClick={() => setCountryFocus(null)}
-              className="ml-2 text-white text-sm cursor-pointer select-none inline-flex items-center"
-              style={{
-                color: "#fff",  
-                padding: "3px 12px",
-                borderRadius: 8,
-                border: "none",
-                background: "#f9013f",
-                marginLeft: 7,
-                marginRight: 3,
-                fontWeight: 400,
-                fontFamily: "Inter, Arial, sans-serif",
-                fontSize: 15,
-                lineHeight: "1.25",
-                transition: "background 0.18s",
-              }}
-              title="Clear"
-              onMouseOver={e => (e.currentTarget.style.background = "#f9013f")}
-              onMouseOut={e => (e.currentTarget.style.background = "#f9013f")}
-            >
-              Clear
-            </button>
-          )}
+          <button
+            onClick={() => setCountryFocus(null)}
+            className="ml-2 text-white text-sm cursor-pointer select-none inline-flex items-center"
+            style={{
+              color: "#fff",
+              padding: "2px 10px",
+              borderRadius: 8,
+              border: "none",
+              background: "#f9013f",
+              marginLeft: 7,
+              marginRight: 3,
+              fontWeight: 400,
+              fontFamily: "Inter, Arial, sans-serif",
+              fontSize: 13,
+              lineHeight: "1.25",
+            }}
+            title="Clear"
+          >
+            ×
+          </button>
         </div>
+        )}
       </div>
       {/* SVG */}
       <div

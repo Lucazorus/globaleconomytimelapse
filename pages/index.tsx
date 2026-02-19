@@ -288,6 +288,20 @@ export default function Home() {
     setCountryFocus(country);
     setSearchInput(country);
     setSearchOpen(false);
+
+    // Si on a un filtre de régions actif (pas World), auto-ajouter la région du pays
+    setSelectedRegions((current) => {
+      // World (null) = pas de filtre, toutes les régions visibles — rien à faire
+      if (!current || current.length === 0) return current;
+      // Trouver la région du pays dans les données courantes
+      const countryRecord = currentDataForSearch.find((d: any) => d.country === country);
+      const region = countryRecord?.region;
+      if (!region || region === "Other") return current;
+      // Si la région est déjà sélectionnée, rien à faire
+      if (current.includes(region)) return current;
+      // Sinon, ajouter la région au filtre actif
+      return [...current, region];
+    });
   }
 
   function handleSearchClear() {
