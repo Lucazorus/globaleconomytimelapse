@@ -26,6 +26,7 @@ export default function AnimatedTreemapGDP({
   proportional,
   setProportional,
   mode,
+  metricLabel = "",
 }) {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
@@ -845,9 +846,44 @@ export default function AnimatedTreemapGDP({
       {/* SVG */}
       <div
         className="w-full overflow-x-auto"
-        style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}
+        style={{ flex: 1, minHeight: 0, alignItems: "stretch", position: "relative" }}
         onMouseLeave={() => setTooltip((tt) => tt.show ? { ...tt, show: false } : tt)}
       >
+        {/* Overlay année + métrique */}
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            left: 16,
+            zIndex: 10,
+            pointerEvents: "none",
+            lineHeight: 1,
+          }}
+        >
+          <div style={{
+            fontSize: "clamp(2.5rem, 6vw, 5rem)",
+            fontWeight: 800,
+            color: "rgba(255,255,255,0.12)",
+            fontFamily: "Inter, Arial, sans-serif",
+            letterSpacing: "-0.02em",
+            lineHeight: 1,
+          }}>
+            {Math.round(animValue)}
+          </div>
+          {metricLabel && (
+            <div style={{
+              fontSize: "clamp(0.65rem, 1.2vw, 0.9rem)",
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.25)",
+              fontFamily: "Inter, Arial, sans-serif",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginTop: 2,
+            }}>
+              {metricLabel}
+            </div>
+          )}
+        </div>
         <svg
           ref={svgRef}
           width={width}

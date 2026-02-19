@@ -466,6 +466,7 @@ export default function Home() {
             proportional={proportional}
             setProportional={setProportional}
             mode={mode}
+            metricLabel={info.label}
           />
         )}
         {graph === "barchart" && (
@@ -484,6 +485,7 @@ export default function Home() {
             isPerCapita={isPerCapita}
             topN={topN}
             setTopN={setTopN}
+            metricLabel={info.label}
           />
         )}
       </div>

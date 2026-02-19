@@ -36,6 +36,7 @@ interface BarChartRaceProps {
   isPerCapita?: boolean;
   topN: number;
   setTopN: (v: number) => void;
+  metricLabel?: string;
 }
 
 export default function BarChartRace({
@@ -53,6 +54,7 @@ export default function BarChartRace({
   isPerCapita = false,
   topN,
   setTopN,
+  metricLabel = "",
 }: BarChartRaceProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -730,8 +732,43 @@ export default function BarChartRace({
       {/* SVG */}
       <div
         className="w-full"
-        style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "auto" }}
+        style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "auto", position: "relative" }}
       >
+        {/* Overlay année + métrique */}
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            left: 16,
+            zIndex: 10,
+            pointerEvents: "none",
+            lineHeight: 1,
+          }}
+        >
+          <div style={{
+            fontSize: "clamp(2.5rem, 6vw, 5rem)",
+            fontWeight: 800,
+            color: "rgba(255,255,255,0.10)",
+            fontFamily: "Inter, Arial, sans-serif",
+            letterSpacing: "-0.02em",
+            lineHeight: 1,
+          }}>
+            {Math.round(animValue)}
+          </div>
+          {metricLabel && (
+            <div style={{
+              fontSize: "clamp(0.65rem, 1.2vw, 0.9rem)",
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.20)",
+              fontFamily: "Inter, Arial, sans-serif",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginTop: 2,
+            }}>
+              {metricLabel}
+            </div>
+          )}
+        </div>
         <svg
           ref={svgRef}
           width={width}
