@@ -156,6 +156,42 @@ html, body {
   outline-offset: 2px;
 }
 
+/* === METRIC SELECTOR BUTTONS (style pill, différent des onglets chart) === */
+.metric-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 2rem;
+  padding: 0.22rem 0.80rem;
+  margin: 0.05rem 0.12rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+  user-select: none;
+  white-space: nowrap;
+}
+.metric-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  border-color: rgba(255,255,255,0.22);
+}
+.metric-btn--active {
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  border-color: rgba(255,255,255,0.35);
+  font-weight: 600;
+}
+.metric-btn:focus-visible {
+  outline: 2px solid #719CAF;
+  outline-offset: 2px;
+}
+@media (max-width: 900px) {
+  .metric-btn { font-size: 0.70rem; padding: 0.17rem 0.55rem; }
+}
+
 /* === SLIDER MODERNE GLASS (GRADIENT JUSQU'AU CURSEUR) === */
 input[type="range"] {
   accent-color: unset;

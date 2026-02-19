@@ -340,13 +340,13 @@ export default function Home() {
         padding: 0,
       }}
     >
-      {/* Barre de contrôles */}
-      <div className="w-full mb-2">
+      {/* Barre de contrôles — 2 lignes */}
+      <div className="w-full mb-1">
+        {/* Ligne 1 : type de graphe */}
         <div
-          className="flex flex-wrap justify-center items-center p-2 rounded-2xl"
-          style={{ gap: "0.15rem 0.35rem", marginBottom: 0, minHeight: "38px" }}
+          className="flex justify-center items-center"
+          style={{ gap: "0 0.15rem", paddingTop: "0.35rem", paddingBottom: "0.1rem" }}
         >
-          {/* Onglets chart type */}
           {(["treemap", "barchart"] as ChartType[]).map((c) => (
             <button
               key={c}
@@ -356,20 +356,26 @@ export default function Home() {
               {c === "treemap" ? t.treemap : t.barchart}
             </button>
           ))}
+        </div>
 
-          {/* Séparateur visuel */}
-          <span style={{ width: "1px", height: "18px", background: "rgba(255,255,255,0.18)", margin: "0 0.3rem" }} />
-
-          {/* Boutons métrique — même style que les onglets chart */}
+        {/* Ligne 2 : métrique + recherche pays */}
+        <div
+          className="flex flex-wrap justify-center items-center"
+          style={{ gap: "0.1rem 0.2rem", paddingBottom: "0.3rem" }}
+        >
+          {/* Boutons métrique — style pill */}
           {(Object.entries(metricInfo) as [MetricType, { label: string }][]).map(([key, val]) => (
             <button
               key={key}
-              onClick={() => setMetric(key)}
-              className={`graph-btn${metric === key ? " graph-btn--active" : ""}`}
+              onClick={() => setMetric(key as MetricType)}
+              className={`metric-btn${metric === key ? " metric-btn--active" : ""}`}
             >
               {val.label}
             </button>
           ))}
+
+          {/* Séparateur visuel */}
+          <span style={{ width: "1px", height: "16px", background: "rgba(255,255,255,0.14)", margin: "0 0.2rem" }} />
 
           {/* Widget de recherche pays */}
           <div ref={searchRef} className="country-search-wrapper">
