@@ -660,7 +660,7 @@ export default function BumpChart({
           .attr("fill", isFocused ? "#FA003F" : "rgba(255,255,255,0.55)")
           .attr("opacity", opacity)
           .attr("pointer-events", "none")
-          .text(`#${rankInterp}`);
+          .text(`${rankInterp}`);
       }
 
       if (flag) {

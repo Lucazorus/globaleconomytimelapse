@@ -28,7 +28,7 @@ function parseChart(val: string | string[] | undefined): ChartType {
   if (typeof val === "string" && VALID_CHARTS.includes(val as ChartType)) {
     return val as ChartType;
   }
-  return "treemap";
+  return "bumpchart";
 }
 
 function parseMetric(val: string | string[] | undefined): MetricType {
@@ -42,7 +42,7 @@ function parseGraph(val: string | string[] | undefined): GraphType {
   if (typeof val === "string" && VALID_CHARTS.includes(val as ChartType)) {
     return val as GraphType;
   }
-  return "treemap";
+  return "bumpchart";
 }
 
 function parseMode(val: string | string[] | undefined): "world" | "ffa" {
