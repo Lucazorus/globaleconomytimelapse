@@ -8,6 +8,7 @@ export const TRANSLATIONS = {
     // Onglets
     treemap: "TREEMAP",
     barchart: "BAR CHART",
+    bumpchart: "BUMP CHART",
 
     // Métriques labels (dropdown)
     gdpLabel: "PIB total",
@@ -47,6 +48,7 @@ export const TRANSLATIONS = {
 
     treemap: "TREEMAP",
     barchart: "BAR CHART",
+    bumpchart: "BUMP CHART",
 
     gdpLabel: "Total GDP",
     percapLabel: "GDP / capita",

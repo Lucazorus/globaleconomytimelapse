@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import AnimatedTreemapGDP from "../components/AnimatedTreemapGDP";
 import BarChartRace from "../components/BarChartRace";
+import BumpChart from "../components/BumpChart";
 import { useLang } from "../lib/LangContext";
 
 // --- Helpers ---
@@ -13,13 +14,13 @@ function findClosestYear(target: number, years: number[]): number | null {
 }
 
 // --- URL parsing helpers ---
-type ChartType = "treemap" | "barchart";
+type ChartType = "treemap" | "barchart" | "bumpchart";
 type MetricType = "gdp" | "percap" | "ppp";
-const VALID_CHARTS: ChartType[] = ["treemap", "barchart"];
+const VALID_CHARTS: ChartType[] = ["treemap", "barchart", "bumpchart"];
 const VALID_METRICS: MetricType[] = ["gdp", "percap", "ppp"];
 
 // Keep GraphType for URL compat
-type GraphType = "treemap" | "barchart";
+type GraphType = "treemap" | "barchart" | "bumpchart";
 
 // METRIC_INFO is built dynamically from translations — see getMetricInfo() below
 
@@ -361,13 +362,13 @@ export default function Home() {
           className="flex justify-center items-center"
           style={{ gap: "0 0.15rem", paddingTop: "0.35rem", paddingBottom: "0.1rem" }}
         >
-          {(["treemap", "barchart"] as ChartType[]).map((c) => (
+          {(["bumpchart", "barchart", "treemap"] as ChartType[]).map((c) => (
             <button
               key={c}
               onClick={() => setGraph(c)}
               className={`graph-btn${graph === c ? " graph-btn--active" : ""}`}
             >
-              {c === "treemap" ? t.treemap : t.barchart}
+              {c === "treemap" ? t.treemap : c === "barchart" ? t.barchart : t.bumpchart}
             </button>
           ))}
         </div>
@@ -469,6 +470,24 @@ export default function Home() {
             data={currentData}
             years={currentYears}
             year={activeYear}
+            animValue={animValue}
+            playing={playing}
+            setPlaying={setPlaying}
+            onYearChange={handleYearChange}
+            countryFocus={countryFocus}
+            setCountryFocus={setCountryFocus}
+            selectedRegions={selectedRegions}
+            setSelectedRegions={setSelectedRegions}
+            isPerCapita={isPerCapita}
+            topN={topN}
+            setTopN={setTopN}
+            metricLabel={info.label}
+          />
+        )}
+        {graph === "bumpchart" && (
+          <BumpChart
+            data={currentData}
+            years={currentYears}
             animValue={animValue}
             playing={playing}
             setPlaying={setPlaying}

@@ -718,40 +718,32 @@ export default function AnimatedTreemapGDP({
           lineHeight: "1.2",
         }}
       >
-        {/* Année + Métrique + Play groupés à gauche */}
-        <div className="shrink-0 flex items-center gap-2">
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", lineHeight: 1, minWidth: 60 }}>
+        {/* Année + Métrique — grand espace à gauche */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1, minWidth: 80, flexShrink: 0 }}>
+          <span style={{
+            fontSize: "2rem",
+            fontWeight: 800,
+            color: "rgba(255,255,255,0.85)",
+            fontFamily: "Inter, Arial, sans-serif",
+            letterSpacing: "-0.02em",
+            lineHeight: 1,
+          }}>
+            {Math.round(animValue)}
+          </span>
+          {metricLabel && (
             <span style={{
-              fontSize: "1.6rem",
-              fontWeight: 800,
-              color: "rgba(255,255,255,0.85)",
+              fontSize: "0.6rem",
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.35)",
               fontFamily: "Inter, Arial, sans-serif",
-              letterSpacing: "-0.02em",
+              letterSpacing: "0.07em",
+              textTransform: "uppercase",
+              marginTop: 2,
               lineHeight: 1,
             }}>
-              {Math.round(animValue)}
+              {metricLabel}
             </span>
-            {metricLabel && (
-              <span style={{
-                fontSize: "0.6rem",
-                fontWeight: 600,
-                color: "rgba(255,255,255,0.35)",
-                fontFamily: "Inter, Arial, sans-serif",
-                letterSpacing: "0.07em",
-                textTransform: "uppercase",
-                marginTop: 2,
-                lineHeight: 1,
-              }}>
-                {metricLabel}
-              </span>
-            )}
-          </div>
-          <PlayPauseButton
-            playing={playing}
-            onClick={handlePlayPause}
-            size={34}
-            disabled={years.length < 2}
-          />
+          )}
         </div>
         {/* Slider */}
         <div className="flex-1 flex items-center justify-center min-w-[120px]">
@@ -768,6 +760,15 @@ export default function AnimatedTreemapGDP({
             }}
             className="w-full h-1.5 bg-white/30 rounded-lg accent-blue-400"
             style={{ minWidth: 90, maxWidth: 250, height: 5 }}
+          />
+        </div>
+        {/* Play/Pause */}
+        <div className="shrink-0">
+          <PlayPauseButton
+            playing={playing}
+            onClick={handlePlayPause}
+            size={34}
+            disabled={years.length < 2}
           />
         </div>
         {/* Année */}
