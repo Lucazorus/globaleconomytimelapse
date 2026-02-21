@@ -84,8 +84,8 @@ export default function BumpChart({
 
   // ---- Tooltip ----
   const [tooltip, setTooltip] = useState<{
-    show: boolean; x: number; y: number; name: string; value: number | null; region: string;
-  }>({ show: false, x: 0, y: 0, name: "", value: null, region: "" });
+    show: boolean; x: number; y: number; name: string; value: number | null; region: string; year: number | null;
+  }>({ show: false, x: 0, y: 0, name: "", value: null, region: "", year: null });
 
   const lastTooltipSeen = useRef(Date.now());
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -290,9 +290,9 @@ export default function BumpChart({
     const focusedRank = countryFocus ? (currentRanks.get(countryFocus) ?? -1) : -1;
     let windowStart = 1;
     if (focusedRank > 0) {
-      const ideal = focusedRank - Math.floor(topN / 2);
+      // Maximize countries above the focused one: place it as low as possible in the window
       const maxStart = Math.max(1, totalCountries - topN + 1);
-      windowStart = Math.max(1, Math.min(ideal, maxStart));
+      windowStart = Math.max(1, Math.min(focusedRank - topN + 1, maxStart));
     }
     const windowEnd = windowStart + topN - 1;
 
@@ -452,12 +452,48 @@ export default function BumpChart({
       }
 
       // Past dots (all except the head — head is in the heads layer)
-      points.slice(0, -1).forEach(pt => {
+      // Build with year info for tooltip, skipping the last point (= head)
+      const pastPoints = yearsToShow
+        .map(y => {
+          const v = gdpByYear.get(y)?.get(country);
+          const yPos = v != null && v > 0 ? yScale(v) : null;
+          return yPos != null ? { x: xScale(y) ?? 0, y: yPos, year: y, gdp: v! } : null;
+        })
+        .filter(Boolean) as { x: number; y: number; year: number; gdp: number }[];
+
+      pastPoints.slice(0, -1).forEach(pt => {
+        // Invisible hit area (larger) — same pattern as head dots
         cg.append("circle")
+          .attr("class", "dot-hit")
+          .attr("cx", pt.x).attr("cy", pt.y)
+          .attr("r", (isFocused ? 2.5 : 1.8) + 6)
+          .attr("fill", "transparent")
+          .attr("stroke", "none")
+          .style("cursor", "pointer")
+          .on("mousemove", (event: MouseEvent) => {
+            touchTooltip();
+            setTooltip({
+              show: true,
+              x: event.clientX,
+              y: event.clientY,
+              name: country,
+              value: pt.gdp,
+              region: region,
+              year: pt.year,
+            });
+          })
+          .on("mouseleave", () => {
+            setTooltip(tt => ({ ...tt, show: false }));
+          });
+
+        // Visible dot
+        cg.append("circle")
+          .attr("class", "dot-visible")
           .attr("cx", pt.x).attr("cy", pt.y)
           .attr("r", isFocused ? 2.5 : 1.8)
           .attr("fill", color)
-          .attr("fill-opacity", opacity * 0.6);
+          .attr("fill-opacity", opacity * 0.6)
+          .attr("pointer-events", "none");
       });
     });
 
@@ -563,11 +599,13 @@ export default function BumpChart({
       if (points.length >= 2) {
         cg.select("path").datum(points).attr("d", lineGen);
       }
-      // Reposition past dots (circles in static layer) to the new yScale
-      cg.selectAll("circle").each(function(_, i) {
-        const pt = points[i];
-        if (pt) d3.select(this).attr("cx", pt.x).attr("cy", pt.y);
-      });
+      // Reposition past dots — 2 circles per dot (dot-hit + dot-visible), same position
+      cg.selectAll<SVGCircleElement, unknown>("circle.dot-hit, circle.dot-visible")
+        .each(function(_, i) {
+          const ptIdx = Math.floor(i / 2); // 2 circles per point
+          const pt = points[ptIdx];
+          if (pt) d3.select(this).attr("cx", pt.x).attr("cy", pt.y);
+        });
     });
 
     const headsG = g.select<SVGGElement>(".heads-layer");
@@ -627,6 +665,7 @@ export default function BumpChart({
             name: country,
             value: pt.gdp,
             region: region,
+            year: Math.round(animValue),
           });
         })
         .on("mouseleave", () => {
@@ -730,13 +769,25 @@ export default function BumpChart({
             fontSize: 15,
             textTransform: "uppercase",
             letterSpacing: "0.04em",
-            marginBottom: 4,
+            marginBottom: 2,
             lineHeight: 1.2,
             whiteSpace: "nowrap",
             color: "#fff",
           }}>
             {tooltip.name}
           </span>
+          {tooltip.year != null && (
+            <span style={{
+              fontSize: 11,
+              fontWeight: 400,
+              color: "rgba(255,255,255,0.45)",
+              fontFamily: "Inter, Arial, sans-serif",
+              marginBottom: 4,
+              lineHeight: 1.2,
+            }}>
+              {tooltip.year}
+            </span>
+          )}
           <span style={{
             fontWeight: 300,
             fontSize: 14,

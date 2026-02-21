@@ -218,15 +218,14 @@ export default function BarChartRace({
       .filter((d) => d.gdp > 0)
       .sort((a, b) => b.gdp - a.gdp);
 
-    // Fenêtre glissante : centrer sur le pays focusé
+    // Fenêtre glissante : maximize countries above the focused one
     const focusedRank = countryFocus
       ? allSorted.findIndex((d) => d.country === countryFocus)
       : -1;
     let windowStart = 0;
     if (focusedRank >= 0) {
-      const ideal = focusedRank - Math.floor(topN / 2);
       const maxStart = Math.max(0, allSorted.length - topN);
-      windowStart = Math.max(0, Math.min(ideal, maxStart));
+      windowStart = Math.max(0, Math.min(focusedRank - topN + 1, maxStart));
     }
     const interpTop = allSorted.slice(windowStart, windowStart + topN);
 
