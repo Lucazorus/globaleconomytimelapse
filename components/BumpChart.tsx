@@ -226,6 +226,7 @@ export default function BumpChart({
     xScale: d3.ScalePoint<number>;
     yScale: d3.ScaleLinear<number, number>;
     gdpByYear: Map<number, Map<string, number>>;
+    ranksByYear: Map<number, Map<string, number>>;
     visibleCountries: string[];
     countryRegion: Map<string, string>;
     innerH: number;
@@ -354,7 +355,7 @@ export default function BumpChart({
       .clamp(true);
 
     // Save for the head-update pass
-    scalesRef.current = { xScale, yScale, gdpByYear, visibleCountries, countryRegion, innerH, innerW };
+    scalesRef.current = { xScale, yScale, gdpByYear, ranksByYear, visibleCountries, countryRegion, innerH, innerW };
 
     function getY(country: string, year: number): number | null {
       const v = gdpByYear.get(year)?.get(country);
@@ -469,7 +470,7 @@ export default function BumpChart({
   // ------ D3 render — HEAD pass (smooth interpolation every animValue tick) ------
   useEffect(() => {
     if (!svgRef.current || !scalesRef.current || !yDomainRef.current) return;
-    const { xScale, gdpByYear, visibleCountries, countryRegion, innerH, innerW } = scalesRef.current;
+    const { xScale, gdpByYear, ranksByYear, visibleCountries, countryRegion, innerH, innerW } = scalesRef.current;
 
     // --- Smooth Y-domain lerp ---
     const dom = yDomainRef.current;
@@ -600,6 +601,13 @@ export default function BumpChart({
       const flag = flagEmoji(country);
       const dotR = isFocused ? 5 : 4;
 
+      // Interpolate rank between y1 and y2 (round to nearest integer for display)
+      const rank1 = ranksByYear.get(y1)?.get(country) ?? null;
+      const rank2 = ranksByYear.get(y2)?.get(country) ?? null;
+      const rankInterp = rank1 != null && rank2 != null
+        ? Math.round(rank1 * (1 - t) + rank2 * t)
+        : (rank1 ?? rank2 ?? null);
+
       const hg = headsG.append("g")
         .style("cursor", "pointer")
         .on("click", () => setCountryFocus(isFocused ? null : country));
@@ -634,13 +642,34 @@ export default function BumpChart({
         .attr("stroke-width", isFocused ? 1.5 : 0.8)
         .attr("pointer-events", "none");
 
+      // Rank + flag stacked above the dot
+      const aboveY = pt.y - dotR - 3;
+      const flagSize = isFocused ? 16 : 13;
+      const rankSize = isFocused ? 9 : 8;
+
+      // Rank number (above the flag)
+      if (rankInterp != null) {
+        hg.append("text")
+          .attr("x", pt.x)
+          .attr("y", aboveY - flagSize - 1)
+          .attr("text-anchor", "middle")
+          .attr("dominant-baseline", "auto")
+          .attr("font-size", rankSize)
+          .attr("font-weight", 700)
+          .attr("font-family", "Inter, Arial, sans-serif")
+          .attr("fill", isFocused ? "#FA003F" : "rgba(255,255,255,0.55)")
+          .attr("opacity", opacity)
+          .attr("pointer-events", "none")
+          .text(`#${rankInterp}`);
+      }
+
       if (flag) {
         hg.append("text")
           .attr("x", pt.x)
-          .attr("y", pt.y - dotR - 3)
+          .attr("y", aboveY)
           .attr("text-anchor", "middle")
           .attr("dominant-baseline", "auto")
-          .attr("font-size", isFocused ? 18 : 14)
+          .attr("font-size", flagSize)
           .attr("opacity", opacity)
           .attr("pointer-events", "none")
           .text(flag);
