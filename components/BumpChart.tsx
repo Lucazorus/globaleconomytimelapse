@@ -642,26 +642,9 @@ export default function BumpChart({
         .attr("stroke-width", isFocused ? 1.5 : 0.8)
         .attr("pointer-events", "none");
 
-      // Rank + flag stacked above the dot
+      // Flag above the dot
       const aboveY = pt.y - dotR - 3;
       const flagSize = isFocused ? 16 : 13;
-      const rankSize = isFocused ? 9 : 8;
-
-      // Rank number (above the flag)
-      if (rankInterp != null) {
-        hg.append("text")
-          .attr("x", pt.x)
-          .attr("y", aboveY - flagSize - 1)
-          .attr("text-anchor", "middle")
-          .attr("dominant-baseline", "auto")
-          .attr("font-size", rankSize)
-          .attr("font-weight", 700)
-          .attr("font-family", "Inter, Arial, sans-serif")
-          .attr("fill", isFocused ? "#FA003F" : "rgba(255,255,255,0.55)")
-          .attr("opacity", opacity)
-          .attr("pointer-events", "none")
-          .text(`${rankInterp}`);
-      }
 
       if (flag) {
         hg.append("text")
@@ -675,7 +658,9 @@ export default function BumpChart({
           .text(flag);
       }
 
+      // "N. Country name" label to the right of the dot
       const label = country.length > 13 ? country.slice(0, 12) + "…" : country;
+      const rankPrefix = rankInterp != null ? `${rankInterp}. ` : "";
       hg.append("text")
         .attr("x", pt.x + dotR + 5)
         .attr("y", pt.y)
@@ -686,7 +671,7 @@ export default function BumpChart({
         .attr("fill", isFocused ? "#FA003F" : color)
         .attr("opacity", countryFocus && !isFocused ? 0.45 : 0.85)
         .attr("pointer-events", "none")
-        .text(label);
+        .text(`${rankPrefix}${label}`);
     });
 
   }, [animValue, countryFocus, staticRenderKey]);
