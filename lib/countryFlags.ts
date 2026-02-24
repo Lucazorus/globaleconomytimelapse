@@ -1,5 +1,7 @@
 // Mapping country name → ISO 3166-1 alpha-2 code for flag emoji rendering
+// "eu" is a special code supported by most platforms for the EU flag
 export const COUNTRY_FLAGS: Record<string, string> = {
+  "European Union": "eu",
   "Afghanistan": "af",
   "Albania": "al",
   "Algeria": "dz",
