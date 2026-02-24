@@ -4,6 +4,7 @@ import * as d3 from "d3";
 import { REGION_LIST, regionColors } from "./Colors";
 import PlayPauseButton from "./PlayPauseButton";
 import { flagEmoji } from "../lib/countryFlags";
+import { getEUMembersForYear, EU_LABEL, EU_REGION } from "../lib/euMembership";
 
 interface CountryData {
   year: number;
@@ -28,6 +29,7 @@ interface BumpChartProps {
   setTopN: (v: number) => void;
   metricLabel?: string;
   isPerCapita?: boolean;
+  groupEU: boolean;
 }
 
 function formatValue(v: number, isPerCapita: boolean): string {
@@ -55,6 +57,7 @@ export default function BumpChart({
   setTopN,
   metricLabel = "",
   isPerCapita = false,
+  groupEU,
 }: BumpChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -240,6 +243,27 @@ export default function BumpChart({
   // null-reset when data/filters/size actually change (not on every year tick).
   const yDomainResetKeyRef = useRef<string>("");
 
+  // ------ EU grouping helper ------
+  function applyEUGrouping(rows: CountryData[], year: number): CountryData[] {
+    if (!groupEU) return rows;
+    const euMembers = getEUMembersForYear(year);
+    const nonEU: CountryData[] = [];
+    let euGdp = 0;
+    let euRegion = EU_REGION;
+    for (const row of rows) {
+      if (euMembers.has(row.country)) {
+        euGdp += row.gdp;
+        euRegion = row.region ?? EU_REGION;
+      } else {
+        nonEU.push(row);
+      }
+    }
+    if (euGdp > 0) {
+      nonEU.push({ country: EU_LABEL, gdp: euGdp, year, region: euRegion });
+    }
+    return nonEU;
+  }
+
   // ------ D3 render — STATIC pass (axes + lines + past dots) ------
   // Depends on everything EXCEPT animValue's fractional part → keyed on currentYear (integer)
   const currentYear = Math.round(animValue);
@@ -253,7 +277,7 @@ export default function BumpChart({
 
     // Only null-reset the lerp domain when structural params change (not on year tick).
     // Key: everything except currentYear.
-    const resetKey = `${data.length}|${selectedRegions?.join(",")}|${topN}|${width}|${height}|${isPerCapita}`;
+    const resetKey = `${data.length}|${selectedRegions?.join(",")}|${topN}|${width}|${height}|${isPerCapita}|${groupEU}`;
     if (yDomainResetKeyRef.current !== resetKey) {
       yDomainRef.current = null;
       yDomainResetKeyRef.current = resetKey;
@@ -271,11 +295,12 @@ export default function BumpChart({
       d => d.gdp > 0 && d.region && d.region !== "Other" && safeSelectedRegions.includes(d.region)
     );
 
-    // Build gdp + rank maps for ALL years
+    // Build gdp + rank maps for ALL years (with optional EU grouping)
     const gdpByYear = new Map<number, Map<string, number>>();
     const ranksByYear = new Map<number, Map<string, number>>();
     years.forEach(y => {
-      const yearData = filteredData.filter(d => d.year === y).sort((a, b) => b.gdp - a.gdp);
+      const rawYearData = filteredData.filter(d => d.year === y);
+      const yearData = applyEUGrouping(rawYearData, y).sort((a, b) => b.gdp - a.gdp);
       const gm = new Map<string, number>();
       const rm = new Map<string, number>();
       yearData.forEach((d, i) => { gm.set(d.country, d.gdp); rm.set(d.country, i + 1); });
@@ -501,7 +526,7 @@ export default function BumpChart({
     setStaticRenderKey(k => k + 1);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, years, currentYear, topN, countryFocus, selectedRegions, width, height, isPerCapita]);
+  }, [data, years, currentYear, topN, countryFocus, selectedRegions, width, height, isPerCapita, groupEU]);
 
   // ------ D3 render — HEAD pass (smooth interpolation every animValue tick) ------
   useEffect(() => {

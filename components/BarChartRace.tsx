@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { REGION_LIST, regionColors } from "./Colors";
 import PlayPauseButton from "./PlayPauseButton";
+import { getEUMembersForYear, EU_LABEL, EU_REGION } from "../lib/euMembership";
 
 // Format espace pour les milliers
 function formatNumberSpace(num) {
@@ -37,6 +38,7 @@ interface BarChartRaceProps {
   topN: number;
   setTopN: (v: number) => void;
   metricLabel?: string;
+  groupEU: boolean;
 }
 
 export default function BarChartRace({
@@ -55,6 +57,7 @@ export default function BarChartRace({
   topN,
   setTopN,
   metricLabel = "",
+  groupEU,
 }: BarChartRaceProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -174,6 +177,25 @@ export default function BarChartRace({
   // Focus GDP à afficher (synchronisé à chaque render)
   const [focusGDP, setFocusGDP] = useState<string>("");
 
+  // EU grouping helper
+  function applyEUGrouping(rows: CountryData[], yearVal: number): CountryData[] {
+    if (!groupEU) return rows;
+    const euMembers = getEUMembersForYear(yearVal);
+    const nonEU: CountryData[] = [];
+    let euGdp = 0;
+    for (const row of rows) {
+      if (euMembers.has(row.country)) {
+        euGdp += row.gdp;
+      } else {
+        nonEU.push(row);
+      }
+    }
+    if (euGdp > 0) {
+      nonEU.push({ country: EU_LABEL, gdp: euGdp, year: yearVal, region: EU_REGION });
+    }
+    return nonEU;
+  }
+
   // ------- D3 render main -------
   useEffect(() => {
     if (!svgRef.current || data.length === 0 || years.length === 0) return;
@@ -188,13 +210,14 @@ export default function BarChartRace({
     const regionsArray = safeSelectedRegions;
 
     function createKeyframe(yearVal: number) {
-      let yearData = data.filter(
+      const rawData = data.filter(
         (d) =>
           d.year === yearVal &&
           d.gdp > 0 &&
           d.region && d.region !== "Other" &&
           regionsArray.includes(d.region)
       );
+      const yearData = applyEUGrouping(rawData, yearVal);
       // Ne pas couper ici : on garde tous les pays pour pouvoir centrer sur le pays focusé
       const sorted = yearData
         .sort((a, b) => b.gdp - a.gdp)
@@ -491,6 +514,7 @@ export default function BarChartRace({
     topN,
     barHeight,
     barPadding,
+    groupEU,
   ]);
 
   function handlePlayPause() {

@@ -482,6 +482,7 @@ export default function Home() {
             topN={topN}
             setTopN={setTopN}
             metricLabel={info.label}
+            groupEU={metric === "gdp"}
           />
         )}
         {graph === "bumpchart" && (
@@ -500,6 +501,7 @@ export default function Home() {
             topN={topN}
             setTopN={setTopN}
             metricLabel={info.label}
+            groupEU={metric === "gdp"}
           />
         )}
       </div>
