@@ -33,6 +33,9 @@ export const TRANSLATIONS = {
     searchPlaceholder: "Rechercher un pays…",
     searchClear: "Effacer",
 
+    // Focus multi-pays (bump chart)
+    addCountryPlaceholder: "Ajouter un pays…",
+
     // Composants graphes
     world: "🌍 Monde",
     freeForAll: "Libre",
@@ -42,6 +45,10 @@ export const TRANSLATIONS = {
     gdpAtYear: "PIB cette année",
     clear: "Effacer",
     top: "Top",
+
+    // SEO / meta
+    metaTagline: "L'économie mondiale en animation (1960-2024)",
+    metaDescription: "Visualisation animée de l'économie mondiale de 1960 à 2024 : PIB, PIB par habitant et parité de pouvoir d'achat pour plus de 180 pays. Treemap, bar chart race et bump chart interactifs. Données Banque mondiale.",
   },
   en: {
     langToggle: "Language",
@@ -70,6 +77,9 @@ export const TRANSLATIONS = {
     searchPlaceholder: "Search country…",
     searchClear: "Clear",
 
+    // Multi-country focus (bump chart)
+    addCountryPlaceholder: "Add a country…",
+
     world: "🌍 World",
     freeForAll: "Free for all",
     proportional: "Proportional",
@@ -78,6 +88,10 @@ export const TRANSLATIONS = {
     gdpAtYear: "GDP at this year",
     clear: "Clear",
     top: "Top",
+
+    // SEO / meta
+    metaTagline: "The world economy, animated (1960-2024)",
+    metaDescription: "Animated visualization of the world economy from 1960 to 2024: GDP, GDP per capita and purchasing power parity for 180+ countries. Interactive treemap, bar chart race and bump chart. World Bank data.",
   },
 } as const;
 

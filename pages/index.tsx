@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
+import Head from "next/head";
 import AnimatedTreemapGDP from "../components/AnimatedTreemapGDP";
 import BarChartRace from "../components/BarChartRace";
 import BumpChart from "../components/BumpChart";
 import { useLang } from "../lib/LangContext";
+import { loadMetric, MetricDataset } from "../lib/loadMetric";
+import { SITE_URL } from "../lib/site";
 
 // --- Helpers ---
 function findClosestYear(target: number, years: number[]): number | null {
@@ -20,7 +23,10 @@ const VALID_CHARTS: ChartType[] = ["treemap", "barchart", "bumpchart"];
 const VALID_METRICS: MetricType[] = ["gdp", "percap", "ppp"];
 
 // Keep GraphType for URL compat
-type GraphType = "treemap" | "barchart" | "bumpchart";
+type GraphType = ChartType;
+
+// Nombre max de pays épinglés simultanément (focus multi sur le bump chart)
+const MAX_FOCUS = 4;
 
 // METRIC_INFO is built dynamically from translations — see getMetricInfo() below
 
@@ -67,14 +73,16 @@ function parseYear(val: string | string[] | undefined): number | null {
   return isNaN(n) ? null : n;
 }
 
-function parseCountry(val: string | string[] | undefined): string | null {
-  if (typeof val === "string" && val.trim() !== "") return val.trim();
-  return null;
+// Séparateur "|" : certains noms de pays contiennent une virgule ("Korea, Rep.").
+// Une valeur simple sans séparateur (anciennes URLs) reste valide.
+function parseCountries(val: string | string[] | undefined): string[] {
+  if (typeof val !== "string" || val.trim() === "") return [];
+  return val.split("|").map((c) => c.trim()).filter(Boolean).slice(0, MAX_FOCUS);
 }
 
 export default function Home() {
   const router = useRouter();
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   // Empêche l'écriture URL avant la lecture initiale
   const urlInitialized = useRef(false);
@@ -83,23 +91,26 @@ export default function Home() {
   // Auto-play au premier chargement (une seule fois)
   const hasAutoPlayed = useRef(false);
 
-  const [data, setData] = useState<any[]>([]);
-  const [years, setYears] = useState<number[]>([]);
-  const [dataPerCapita, setDataPerCapita] = useState<any[]>([]);
-  const [yearsPerCapita, setYearsPerCapita] = useState<number[]>([]);
-  const [dataPercapPpp, setDataPercapPpp] = useState<any[]>([]);
-  const [yearsPercapPpp, setYearsPercapPpp] = useState<number[]>([]);
+  // Datasets chargés à la demande, mis en cache par métrique
+  const [datasets, setDatasets] = useState<Partial<Record<MetricType, MetricDataset>>>({});
+  const loadingMetrics = useRef<Set<MetricType>>(new Set());
+  const [urlReady, setUrlReady] = useState(false);
 
   const [graph, setGraph] = useState<ChartType>("treemap");
   const [metric, setMetric] = useState<MetricType>("gdp");
   const [activeYear, setActiveYear] = useState<number | null>(null);
   const [animValue, setAnimValue] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [countryFocus, setCountryFocus] = useState<string | null>(null);
+  // Pays épinglés : multi sur le bump chart, le premier sert de focus
+  // unique pour le treemap et le bar chart
+  const [focusCountries, setFocusCountries] = useState<string[]>([]);
   const [mode, setMode] = useState<"world" | "ffa">("world");
   const [selectedRegions, setSelectedRegions] = useState<null | string[]>(null);
   const [proportional, setProportional] = useState(false);
   const [topN, setTopN] = useState(20);
+
+  const countryFocus = focusCountries.length > 0 ? focusCountries[0] : null;
+  const setCountryFocusSingle = (v: string | null) => setFocusCountries(v ? [v] : []);
 
   // --- Étape 1 : Lecture URL au mount (une seule fois) ---
   useEffect(() => {
@@ -113,71 +124,57 @@ export default function Home() {
     setMode(parseMode(q.mode));
     setSelectedRegions(parseRegions(q.region));
     setProportional(parseProportional(q.proportional));
-    setCountryFocus(parseCountry(q.country));
+    setFocusCountries(parseCountries(q.country));
 
     pendingUrlYear.current = parseYear(q.year);
 
     urlInitialized.current = true;
+    setUrlReady(true);
     // eslint-disable-next-line
   }, [router.isReady]);
 
-  // --- Étape 2 : Fetch GDP total ---
+  // --- Étape 2 : Chargement lazy de la métrique active (avec cache) ---
+  // On attend la lecture de l'URL pour ne charger que la métrique demandée.
   useEffect(() => {
-    fetch("/data/gdp_by_country_year_with_region.json")
-      .then((res) => res.json())
-      .then((json) => {
-        const yearsSet = new Set(json.map((d: any) => d.year));
-        const yearsArr = Array.from(yearsSet).map(Number).sort((a, b) => a - b) as number[];
-        setData(json);
-        setYears(yearsArr);
-        if (activeYear == null) {
-          const targetYear =
-            pendingUrlYear.current != null
-              ? findClosestYear(pendingUrlYear.current, yearsArr) ?? yearsArr[0]
-              : yearsArr[0];
-          setActiveYear(targetYear);
-          setAnimValue(targetYear);
-          // Auto-play dès le premier chargement
-          if (!hasAutoPlayed.current) {
-            hasAutoPlayed.current = true;
-            setTimeout(() => setPlaying(true), 300);
-          }
-        }
+    if (!urlReady) return;
+    const m = metric;
+    if (datasets[m] || loadingMetrics.current.has(m)) return;
+    loadingMetrics.current.add(m);
+    loadMetric(m)
+      .then((ds) => {
+        setDatasets((prev) => ({ ...prev, [m]: ds }));
+      })
+      .catch((err) => {
+        console.error(`Failed to load metric ${m}:`, err);
+      })
+      .finally(() => {
+        loadingMetrics.current.delete(m);
       });
     // eslint-disable-next-line
-  }, []);
+  }, [urlReady, metric, datasets]);
 
-  // --- Étape 3 : Fetch GDP per capita ---
+  // --- Étape 3 : Initialisation de l'année au premier dataset chargé ---
   useEffect(() => {
-    fetch("/data/gdp_per_capita_by_country_year.json")
-      .then((res) => res.json())
-      .then((json) => {
-        const yearsSet = new Set(json.map((d: any) => d.year));
-        const yearsArr = Array.from(yearsSet).map(Number).sort((a, b) => a - b) as number[];
-        setDataPerCapita(json);
-        setYearsPerCapita(yearsArr);
-      });
-  }, []);
-
-  // --- Étape 3b : Fetch GDP per capita PPP ---
-  useEffect(() => {
-    fetch("/data/gdp_per_capita_ppp_by_country_year.json")
-      .then((res) => res.json())
-      .then((json) => {
-        const yearsSet = new Set(json.map((d: any) => d.year));
-        const yearsArr = Array.from(yearsSet).map(Number).sort((a, b) => a - b) as number[];
-        setDataPercapPpp(json);
-        setYearsPercapPpp(yearsArr);
-      });
-  }, []);
+    const ds = datasets[metric];
+    if (!ds || ds.years.length === 0 || activeYear != null) return;
+    const targetYear =
+      pendingUrlYear.current != null
+        ? findClosestYear(pendingUrlYear.current, ds.years) ?? ds.years[0]
+        : ds.years[0];
+    setActiveYear(targetYear);
+    setAnimValue(targetYear);
+    // Auto-play dès le premier chargement
+    if (!hasAutoPlayed.current) {
+      hasAutoPlayed.current = true;
+      setTimeout(() => setPlaying(true), 300);
+    }
+    // eslint-disable-next-line
+  }, [datasets, metric, activeYear]);
 
   // --- Étape 4 : Snap année au plus proche quand la métrique change ---
   useEffect(() => {
     if (activeYear == null) return;
-    let targetYears: number[];
-    if (metric === "gdp") targetYears = years;
-    else if (metric === "percap") targetYears = yearsPerCapita;
-    else targetYears = yearsPercapPpp;
+    const targetYears = datasets[metric]?.years;
     if (targetYears && targetYears.length > 0) {
       const closest = findClosestYear(activeYear, targetYears);
       if (closest !== activeYear && closest != null) {
@@ -186,7 +183,7 @@ export default function Home() {
       }
     }
     // eslint-disable-next-line
-  }, [metric, years, yearsPerCapita, yearsPercapPpp]);
+  }, [metric, datasets]);
 
   // --- Étape 5 : Sync état → URL (shallow replace) ---
   useEffect(() => {
@@ -202,35 +199,43 @@ export default function Home() {
     if (selectedRegions && selectedRegions.length > 0) {
       query.region = selectedRegions.join(",");
     }
-    if (countryFocus) {
-      query.country = countryFocus;
+    if (focusCountries.length > 0) {
+      query.country = focusCountries.join("|");
     }
 
     router.replace({ pathname: "/", query }, undefined, { shallow: true });
     // eslint-disable-next-line
-  }, [graph, metric, activeYear, mode, proportional, selectedRegions, countryFocus]);
+  }, [graph, metric, activeYear, mode, proportional, selectedRegions, focusCountries]);
+
+  // --- Dataset courant (métrique active) ---
+  // Si la métrique active n'est pas encore chargée, on continue d'afficher la
+  // précédente : le graphe reste monté, son animation n'est jamais interrompue.
+  const displayedMetricRef = useRef<MetricType | null>(null);
+  if (datasets[metric]) displayedMetricRef.current = metric;
+  const displayedMetric = displayedMetricRef.current ?? metric;
+  const currentDataset = datasets[displayedMetric];
+  const currentData = currentDataset?.rows ?? [];
+  const currentYears = currentDataset?.years ?? [];
 
   // --- Handlers ---
   const handleYearChange = (val: number | ((v: number) => number)) => {
     setAnimValue((prev) =>
-      typeof val === "function" ? val(prev ?? activeYear ?? years[0]) : val
+      typeof val === "function" ? val(prev ?? activeYear ?? currentYears[0]) : val
     );
     setActiveYear((prev) =>
       typeof val === "function"
-        ? Math.round(val(animValue ?? activeYear ?? years[0]))
+        ? Math.round(val(animValue ?? activeYear ?? currentYears[0]))
         : Math.round(val)
     );
   };
 
   function getActiveYears(): number[] {
-    if (metric === "gdp") return years;
-    if (metric === "percap") return yearsPerCapita;
-    return yearsPercapPpp;
+    return currentYears;
   }
 
   function handlePlayPause() {
     if (playing) {
-      const snapped = Math.round(animValue ?? activeYear ?? years[0]);
+      const snapped = Math.round(animValue ?? activeYear ?? currentYears[0]);
       handleYearChange(snapped);
       setPlaying(false);
     } else {
@@ -251,10 +256,7 @@ export default function Home() {
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Dataset courant pour la liste des pays
-  const currentDataForSearch =
-    metric === "gdp" ? data :
-    metric === "percap" ? dataPerCapita :
-    dataPercapPpp;
+  const currentDataForSearch = currentData;
 
   const allCountries: string[] = Array.from(
     new Set(
@@ -262,17 +264,24 @@ export default function Home() {
     )
   ).sort();
 
+  // Sur le bump chart, masquer les pays déjà épinglés
+  const searchableCountries =
+    graph === "bumpchart"
+      ? allCountries.filter((c) => !focusCountries.includes(c))
+      : allCountries;
+
   const filteredCountries =
     searchInput.trim() === ""
-      ? allCountries
-      : allCountries.filter((c) =>
+      ? searchableCountries
+      : searchableCountries.filter((c) =>
           c.toLowerCase().includes(searchInput.toLowerCase())
         );
 
-  // Sync input ← countryFocus (clic dans le graphe)
+  // Sync input ← countryFocus (clic dans le graphe).
+  // Sur le bump chart les pays épinglés sont affichés en chips : l'input reste vide.
   useEffect(() => {
-    setSearchInput(countryFocus ?? "");
-  }, [countryFocus]);
+    setSearchInput(graph === "bumpchart" ? "" : countryFocus ?? "");
+  }, [countryFocus, graph]);
 
   // Fermeture dropdown au clic extérieur
   useEffect(() => {
@@ -286,8 +295,20 @@ export default function Home() {
   }, []);
 
   function handleSearchSelect(country: string) {
-    setCountryFocus(country);
-    setSearchInput(country);
+    if (graph === "bumpchart") {
+      // Bump chart : la recherche AJOUTE le pays aux épinglés (comparaison)
+      setFocusCountries((current) => {
+        if (current.includes(country)) return current;
+        const next = [...current, country];
+        // Au-delà de la limite, on retire le plus ancien
+        return next.length > MAX_FOCUS ? next.slice(next.length - MAX_FOCUS) : next;
+      });
+      setSearchInput("");
+    } else {
+      // Treemap / bar chart : focus unique (comportement historique)
+      setFocusCountries([country]);
+      setSearchInput(country);
+    }
     setSearchOpen(false);
 
     // Si on a un filtre de régions actif (pas World), auto-ajouter la région du pays
@@ -306,43 +327,70 @@ export default function Home() {
   }
 
   function handleSearchClear() {
-    setCountryFocus(null);
+    setFocusCountries([]);
     setSearchInput("");
     setSearchOpen(false);
   }
 
+  // --- SEO : titre dynamique + Open Graph / Twitter cards ---
+  const metricLabels: Record<MetricType, string> = {
+    gdp: t.gdpLabel,
+    percap: t.percapLabel,
+    ppp: t.pppLabel,
+  };
+  const pageTitle =
+    activeYear != null
+      ? `${metricLabels[metric]} ${activeYear} — Global Economy Timelapse`
+      : `Global Economy Timelapse — ${t.metaTagline}`;
+  const ogImage = `${SITE_URL}/og-image.png`;
+  const seoHead = (
+    <Head>
+      <title>{pageTitle}</title>
+      <meta name="description" content={t.metaDescription} />
+      <link rel="canonical" href={SITE_URL} />
+      <meta property="og:type" content="website" />
+      <meta property="og:site_name" content="Global Economy Timelapse" />
+      <meta property="og:title" content={pageTitle} />
+      <meta property="og:description" content={t.metaDescription} />
+      <meta property="og:url" content={SITE_URL} />
+      <meta property="og:image" content={ogImage} />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+      <meta property="og:locale" content={lang === "fr" ? "fr_FR" : "en_US"} />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={pageTitle} />
+      <meta name="twitter:description" content={t.metaDescription} />
+      <meta name="twitter:image" content={ogImage} />
+    </Head>
+  );
+
   // --- Loading guard ---
   const isLoading =
     activeYear == null || animValue == null ||
-    (metric === "gdp" && (years.length === 0 || data.length === 0)) ||
-    (metric === "percap" && (yearsPerCapita.length === 0 || dataPerCapita.length === 0)) ||
-    (metric === "ppp" && (yearsPercapPpp.length === 0 || dataPercapPpp.length === 0));
+    !currentDataset || currentYears.length === 0;
 
   if (isLoading)
     return (
-      <div className="flex-1 flex items-center justify-center w-full h-full bg-[#1E2D2F]">
-        <div className="text-xl text-slate-100">{t.loading}</div>
-      </div>
+      <>
+        {seoHead}
+        <div className="flex-1 flex items-center justify-center w-full h-full bg-[#1E2D2F]">
+          <div className="text-xl text-slate-100">{t.loading}</div>
+        </div>
+      </>
     );
 
-  const currentData =
-    metric === "gdp" ? data :
-    metric === "percap" ? dataPerCapita :
-    dataPercapPpp;
-  const currentYears =
-    metric === "gdp" ? years :
-    metric === "percap" ? yearsPerCapita :
-    yearsPercapPpp;
-  const isPerCapita = metric === "percap" || metric === "ppp";
+  const isPerCapita = displayedMetric === "percap" || displayedMetric === "ppp";
 
   const metricInfo: Record<MetricType, { label: string; title: string; description: string; example: string }> = {
     gdp:    { label: t.gdpLabel,    title: t.gdpTitle,    description: t.gdpDesc,    example: t.gdpExample },
     percap: { label: t.percapLabel, title: t.percapTitle, description: t.percapDesc, example: t.percapExample },
     ppp:    { label: t.pppLabel,    title: t.pppTitle,    description: t.pppDesc,    example: t.pppExample },
   };
-  const info = metricInfo[metric];
+  const info = metricInfo[displayedMetric];
 
   return (
+    <>
+    {seoHead}
     <div
       className="flex-1 flex flex-col w-full"
       style={{
@@ -398,18 +446,18 @@ export default function Home() {
               <input
                 type="text"
                 className="country-search-input select-glass"
-                placeholder={t.searchPlaceholder}
+                placeholder={graph === "bumpchart" ? t.addCountryPlaceholder : t.searchPlaceholder}
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value);
                   setSearchOpen(true);
-                  if (e.target.value === "") setCountryFocus(null);
+                  if (e.target.value === "" && graph !== "bumpchart") setFocusCountries([]);
                 }}
                 onFocus={() => setSearchOpen(true)}
                 autoComplete="off"
                 spellCheck={false}
               />
-              {(searchInput || countryFocus) && (
+              {(searchInput || focusCountries.length > 0) && (
                 <button
                   className="country-search-clear"
                   onClick={handleSearchClear}
@@ -426,7 +474,7 @@ export default function Home() {
                   <li
                     key={country}
                     className={`country-search-item${
-                      countryFocus === country ? " country-search-item--active" : ""
+                      focusCountries.includes(country) ? " country-search-item--active" : ""
                     }`}
                     onMouseDown={() => handleSearchSelect(country)}
                   >
@@ -454,7 +502,7 @@ export default function Home() {
             setPlaying={setPlaying}
             onYearChange={handleYearChange}
             countryFocus={countryFocus}
-            setCountryFocus={setCountryFocus}
+            setCountryFocus={setCountryFocusSingle}
             selectedRegions={selectedRegions}
             setSelectedRegions={setSelectedRegions}
             freeForAll={mode === "ffa"}
@@ -475,14 +523,14 @@ export default function Home() {
             setPlaying={setPlaying}
             onYearChange={handleYearChange}
             countryFocus={countryFocus}
-            setCountryFocus={setCountryFocus}
+            setCountryFocus={setCountryFocusSingle}
             selectedRegions={selectedRegions}
             setSelectedRegions={setSelectedRegions}
             isPerCapita={isPerCapita}
             topN={topN}
             setTopN={setTopN}
             metricLabel={info.label}
-            groupEU={metric === "gdp"}
+            groupEU={displayedMetric === "gdp"}
           />
         )}
         {graph === "bumpchart" && (
@@ -493,15 +541,15 @@ export default function Home() {
             playing={playing}
             setPlaying={setPlaying}
             onYearChange={handleYearChange}
-            countryFocus={countryFocus}
-            setCountryFocus={setCountryFocus}
+            focusCountries={focusCountries}
+            setFocusCountries={setFocusCountries}
             selectedRegions={selectedRegions}
             setSelectedRegions={setSelectedRegions}
             isPerCapita={isPerCapita}
             topN={topN}
             setTopN={setTopN}
             metricLabel={info.label}
-            groupEU={metric === "gdp"}
+            groupEU={displayedMetric === "gdp"}
           />
         )}
       </div>
@@ -522,5 +570,6 @@ export default function Home() {
         <span style={{ fontStyle: "italic", opacity: 0.7 }}>{info.example}</span>
       </div>
     </div>
+    </>
   );
 }

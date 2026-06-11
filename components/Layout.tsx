@@ -1,5 +1,6 @@
 "use client";
 import React, { ReactNode, useState, useEffect } from "react";
+import Head from "next/head";
 import Script from "next/script";
 import { Inter } from "next/font/google";
 import { useRive, Layout as RiveLayout, Fit, Alignment } from "@rive-app/react-canvas";
@@ -105,9 +106,9 @@ const Layout = ({ children, title }: LayoutProps) => {
       >
         {/* Balise <title> si besoin */}
         {title && (
-          <head>
+          <Head>
             <title>{title}</title>
-          </head>
+          </Head>
         )}
         <header style={{ flexShrink: 0, background: "#1a2327", padding: "8px 24px 0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           {/* Logo + titre */}

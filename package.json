@@ -4,7 +4,8 @@
     "dev": "next",
     "build": "next build",
     "start": "next start",
-    "type-check": "tsc"
+    "type-check": "tsc",
+    "build-data": "node scripts/compact-data.mjs"
   },
   "dependencies": {
     "@rive-app/react-canvas": "^4.21.4",

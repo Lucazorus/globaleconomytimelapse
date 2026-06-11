@@ -21,8 +21,8 @@ interface BumpChartProps {
   playing: boolean;
   setPlaying: (v: boolean) => void;
   onYearChange: (v: any) => void;
-  countryFocus: string | null;
-  setCountryFocus: (v: string | null) => void;
+  focusCountries: string[];
+  setFocusCountries: React.Dispatch<React.SetStateAction<string[]>>;
   selectedRegions: string[] | null;
   setSelectedRegions: React.Dispatch<React.SetStateAction<string[] | null>>;
   topN: number;
@@ -42,6 +42,10 @@ function formatValue(v: number, isPerCapita: boolean): string {
 
 const margin = { top: 16, right: 130, bottom: 36, left: 80 };
 
+// Couleurs vives attribuées aux pays épinglés, dans l'ordre d'épinglage
+const FOCUS_COLORS = ["#FA003F", "#38BDF8", "#FBBF24", "#A78BFA"];
+const MAX_FOCUS = 4;
+
 export default function BumpChart({
   data = [],
   years = [],
@@ -49,8 +53,8 @@ export default function BumpChart({
   playing,
   setPlaying,
   onYearChange,
-  countryFocus,
-  setCountryFocus,
+  focusCountries,
+  setFocusCountries,
   selectedRegions,
   setSelectedRegions,
   topN,
@@ -63,6 +67,22 @@ export default function BumpChart({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const sliderRef = useRef<HTMLInputElement | null>(null);
   const topNSliderRef = useRef<HTMLInputElement | null>(null);
+
+  // --- Focus multi-pays ---
+  const focusSet = new Set(focusCountries);
+  // Le premier pays épinglé pilote la fenêtre glissante (comme l'ancien focus unique)
+  const primaryFocus = focusCountries.length > 0 ? focusCountries[0] : null;
+  // Clé stable pour les dépendances d'effets
+  const focusKey = focusCountries.join("|");
+  const focusColor = (c: string) =>
+    FOCUS_COLORS[Math.max(0, focusCountries.indexOf(c)) % FOCUS_COLORS.length];
+  function toggleFocus(country: string) {
+    setFocusCountries(cur =>
+      cur.includes(country)
+        ? cur.filter(c => c !== country)
+        : [...cur, country].slice(-MAX_FOCUS)
+    );
+  }
 
   // Responsive container
   const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 });
@@ -219,7 +239,7 @@ export default function BumpChart({
     }
   }
 
-  const [focusValue, setFocusValue] = useState<string>("");
+  const [focusValues, setFocusValues] = useState<Record<string, string>>({});
   // Bumped after every static pass to force the head pass to re-run even when animValue hasn't changed.
   const [staticRenderKey, setStaticRenderKey] = useState(0);
 
@@ -312,7 +332,7 @@ export default function BumpChart({
 
     // Sliding window by rank at currentYear
     const currentRanks = ranksByYear.get(currentYear) ?? new Map();
-    const focusedRank = countryFocus ? (currentRanks.get(countryFocus) ?? -1) : -1;
+    const focusedRank = primaryFocus ? (currentRanks.get(primaryFocus) ?? -1) : -1;
     let windowStart = 1;
     if (focusedRank > 0) {
       // Maximize countries above the focused one: place it as low as possible in the window
@@ -325,18 +345,22 @@ export default function BumpChart({
     currentRanks.forEach((rank, country) => {
       if (rank >= windowStart && rank <= windowEnd) visibleSet.add(country);
     });
-    if (countryFocus && currentRanks.has(countryFocus)) visibleSet.add(countryFocus);
+    focusCountries.forEach(c => { if (currentRanks.has(c)) visibleSet.add(c); });
     const visibleCountries = Array.from(visibleSet);
 
     const countryRegion = new Map<string, string>();
     filteredData.forEach(d => { if (!countryRegion.has(d.country)) countryRegion.set(d.country, d.region); });
 
-    // Update focus value
-    if (countryFocus) {
-      const gdp = gdpByYear.get(currentYear)?.get(countryFocus);
-      setFocusValue(gdp != null ? formatValue(gdp, isPerCapita) : "—");
+    // Update focus values (un par pays épinglé)
+    if (focusCountries.length > 0) {
+      const vals: Record<string, string> = {};
+      focusCountries.forEach(c => {
+        const gdp = gdpByYear.get(currentYear)?.get(c);
+        vals[c] = gdp != null ? formatValue(gdp, isPerCapita) : "—";
+      });
+      setFocusValues(vals);
     } else {
-      setFocusValue("");
+      setFocusValues({});
     }
 
     // Y domain — computed on yearsToShow only so it grows with the animation.
@@ -435,9 +459,9 @@ export default function BumpChart({
     g.append("g").attr("class", "heads-layer");
 
     const sorted = [...visibleCountries].sort((a, b) => {
-      if (a === countryFocus) return 1;
-      if (b === countryFocus) return -1;
-      return 0;
+      const af = focusSet.has(a) ? 1 : 0;
+      const bf = focusSet.has(b) ? 1 : 0;
+      return af - bf;
     });
 
     const lineGen = d3.line<{ x: number; y: number }>()
@@ -446,10 +470,10 @@ export default function BumpChart({
       .defined(d => isFinite(d.y));
 
     sorted.forEach(country => {
-      const isFocused = country === countryFocus;
+      const isFocused = focusSet.has(country);
       const region = countryRegion.get(country) ?? "Other";
-      const color = isFocused ? "#FA003F" : regionColors(region);
-      const opacity = countryFocus && !isFocused ? 0.25 : 1;
+      const color = isFocused ? focusColor(country) : regionColors(region);
+      const opacity = focusCountries.length > 0 && !isFocused ? 0.25 : 1;
 
       // Points up to currentYear (integers only for static pass)
       const points: { x: number; y: number }[] = [];
@@ -462,7 +486,7 @@ export default function BumpChart({
       const cg = linesG.append("g")
         .attr("data-country", country)
         .style("cursor", "pointer")
-        .on("click", () => setCountryFocus(isFocused ? null : country));
+        .on("click", () => toggleFocus(country));
 
       if (points.length >= 2) {
         cg.append("path")
@@ -526,7 +550,7 @@ export default function BumpChart({
     setStaticRenderKey(k => k + 1);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, years, currentYear, topN, countryFocus, selectedRegions, width, height, isPerCapita, groupEU]);
+  }, [data, years, currentYear, topN, focusKey, selectedRegions, width, height, isPerCapita, groupEU]);
 
   // ------ D3 render — HEAD pass (smooth interpolation every animValue tick) ------
   useEffect(() => {
@@ -636,27 +660,33 @@ export default function BumpChart({
     const headsG = g.select<SVGGElement>(".heads-layer");
     headsG.selectAll("*").remove();
 
-    // Update focus value with interpolated GDP
-    if (countryFocus) {
-      const v1 = gdpByYear.get(y1)?.get(countryFocus);
-      const v2 = gdpByYear.get(y2)?.get(countryFocus);
-      if (v1 != null || v2 != null) {
-        const vInterp = ((v1 ?? v2 ?? 0) * (1 - t)) + ((v2 ?? v1 ?? 0) * t);
-        setFocusValue(formatValue(vInterp, isPerCapita));
-      }
+    // Update focus values with interpolated GDP (un par pays épinglé)
+    if (focusCountries.length > 0) {
+      setFocusValues(prev => {
+        const vals: Record<string, string> = { ...prev };
+        focusCountries.forEach(c => {
+          const v1 = gdpByYear.get(y1)?.get(c);
+          const v2 = gdpByYear.get(y2)?.get(c);
+          if (v1 != null || v2 != null) {
+            const vInterp = ((v1 ?? v2 ?? 0) * (1 - t)) + ((v2 ?? v1 ?? 0) * t);
+            vals[c] = formatValue(vInterp, isPerCapita);
+          }
+        });
+        return vals;
+      });
     }
 
     const sorted = [...visibleCountries].sort((a, b) => {
-      if (a === countryFocus) return 1;
-      if (b === countryFocus) return -1;
-      return 0;
+      const af = focusSet.has(a) ? 1 : 0;
+      const bf = focusSet.has(b) ? 1 : 0;
+      return af - bf;
     });
 
     sorted.forEach(country => {
-      const isFocused = country === countryFocus;
+      const isFocused = focusSet.has(country);
       const region = countryRegion.get(country) ?? "Other";
-      const color = isFocused ? "#FA003F" : regionColors(region);
-      const opacity = countryFocus && !isFocused ? 0.25 : 1;
+      const color = isFocused ? focusColor(country) : regionColors(region);
+      const opacity = focusCountries.length > 0 && !isFocused ? 0.25 : 1;
 
       const pt = getInterpolatedPoint(country);
       if (!pt) return;
@@ -673,7 +703,7 @@ export default function BumpChart({
 
       const hg = headsG.append("g")
         .style("cursor", "pointer")
-        .on("click", () => setCountryFocus(isFocused ? null : country));
+        .on("click", () => toggleFocus(country));
 
       // Invisible larger hit area for tooltip
       hg.append("circle")
@@ -732,13 +762,13 @@ export default function BumpChart({
         .attr("font-size", isFocused ? 12 : 10)
         .attr("font-weight", isFocused ? 700 : 400)
         .attr("font-family", "Inter, Arial, sans-serif")
-        .attr("fill", isFocused ? "#FA003F" : color)
-        .attr("opacity", countryFocus && !isFocused ? 0.45 : 0.85)
+        .attr("fill", isFocused ? focusColor(country) : color)
+        .attr("opacity", focusCountries.length > 0 && !isFocused ? 0.45 : 0.85)
         .attr("pointer-events", "none")
         .text(`${rankPrefix}${label}`);
     });
 
-  }, [animValue, countryFocus, staticRenderKey]);
+  }, [animValue, focusKey, staticRenderKey]);
 
   const roundedYear = Math.round(animValue);
 
@@ -984,55 +1014,55 @@ export default function BumpChart({
           </span>
         </div>
 
-        {/* Focus country display */}
-        {countryFocus && (
-          <div className="flex flex-row items-center ml-2">
-            <span style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "rgba(255,255,255,0.7)",
-              fontFamily: "Inter, Arial, sans-serif",
-              marginRight: 4,
-            }}>
-              {flagEmoji(countryFocus)} {countryFocus}
-            </span>
-            {focusValue && (
-              <span style={{
-                padding: "1px 9px",
-                marginLeft: 7,
-                marginRight: 5,
-                fontSize: 15,
-                fontWeight: 500,
-                fontFamily: "Inter, Arial, sans-serif",
-                background: "rgba(255,255,255,0.09)",
-                borderRadius: 7,
-                minWidth: 80,
-                display: "inline-block",
-                textAlign: "center",
-                lineHeight: "1.25",
-                opacity: 0.93,
-              }} title="GDP">
-                {focusValue}
+        {/* Pays épinglés (focus multi) */}
+        {focusCountries.length > 0 && (
+          <div className="flex flex-row items-center flex-wrap ml-2" style={{ gap: 6 }}>
+            {focusCountries.map((c) => (
+              <span
+                key={c}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "2px 6px 2px 10px",
+                  borderRadius: 999,
+                  background: `${focusColor(c)}1d`,
+                  boxShadow: `0 0 0 1.5px ${focusColor(c)}90`,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "rgba(255,255,255,0.88)",
+                  fontFamily: "Inter, Arial, sans-serif",
+                  lineHeight: "1.5",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {flagEmoji(c)} {c.length > 16 ? c.slice(0, 15) + "…" : c}
+                {focusValues[c] && (
+                  <span style={{ opacity: 0.75, fontWeight: 400, minWidth: 62, textAlign: "right" }}>
+                    {focusValues[c]}
+                  </span>
+                )}
+                <button
+                  onClick={() => setFocusCountries(cur => cur.filter(x => x !== c))}
+                  aria-label={`× ${c}`}
+                  style={{
+                    border: "none",
+                    background: "rgba(255,255,255,0.13)",
+                    color: "rgba(255,255,255,0.85)",
+                    borderRadius: 999,
+                    width: 17,
+                    height: 17,
+                    fontSize: 11,
+                    lineHeight: "17px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  ×
+                </button>
               </span>
-            )}
-            <button
-              onClick={() => setCountryFocus(null)}
-              style={{
-                color: "#fff",
-                padding: "2px 10px",
-                borderRadius: 8,
-                border: "none",
-                background: "#f9013f",
-                marginLeft: 7,
-                fontWeight: 400,
-                fontFamily: "Inter, Arial, sans-serif",
-                fontSize: 13,
-                lineHeight: "1.25",
-                cursor: "pointer",
-              }}
-            >
-              ×
-            </button>
+            ))}
           </div>
         )}
       </div>

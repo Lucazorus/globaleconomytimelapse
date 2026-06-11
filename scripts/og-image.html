@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px; height: 630px;
+    background: #1a2327;
+    font-family: -apple-system, "Inter", "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+    position: relative;
+  }
+  .left {
+    position: absolute;
+    left: 64px; top: 0; bottom: 0;
+    width: 480px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  h1 {
+    color: #e9eef4;
+    font-size: 58px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1.12;
+    text-transform: uppercase;
+  }
+  h1 .accent { color: #6FAF84; }
+  .tagline {
+    margin-top: 26px;
+    color: #aebccb;
+    font-size: 26px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+  .years {
+    margin-top: 18px;
+    color: #6FAF84;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .source {
+    margin-top: 30px;
+    color: #94a3b8;
+    font-size: 18px;
+    opacity: 0.85;
+  }
+  .map { position: absolute; right: 0; top: 0; width: 600px; height: 630px; }
+  .cell {
+    position: absolute;
+    border-radius: 10px;
+    display: flex; flex-direction: column;
+    justify-content: flex-start; align-items: flex-start;
+    padding: 14px 16px;
+    color: rgba(20, 28, 32, 0.85);
+    font-weight: 700;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10);
+  }
+  .cell .name { font-size: 22px; }
+  .cell .val { font-size: 15px; font-weight: 500; opacity: 0.75; margin-top: 2px; }
+  .cell.small .name { font-size: 15px; }
+  .cell.small .val { display: none; }
+  .cell.tiny .name { font-size: 12px; }
+  .cell.tiny .val { display: none; }
+</style>
+</head>
+<body>
+  <div class="left">
+    <h1>Global<br>Economy<br><span class="accent">Timelapse</span></h1>
+    <div class="years">1960 → 2024</div>
+    <div class="tagline">PIB, PIB par habitant &amp; PPA<br>de 180+ pays, en animation</div>
+    <div class="source">Treemap · Bar chart race · Bump chart — Données World Bank</div>
+  </div>
+
+  <div class="map">
+    <!-- North America -->
+    <div class="cell" style="left:6px; top:6px; width:300px; height:330px; background:#6FAF96;">
+      <span class="name">🇺🇸 United States</span><span class="val">$29.2T</span>
+    </div>
+    <!-- Asia -->
+    <div class="cell" style="left:312px; top:6px; width:282px; height:218px; background:#D8AF47;">
+      <span class="name">🇨🇳 China</span><span class="val">$18.7T</span>
+    </div>
+    <div class="cell small" style="left:312px; top:230px; width:140px; height:106px; background:#D8AF47;">
+      <span class="name">🇯🇵 Japan</span>
+    </div>
+    <div class="cell small" style="left:458px; top:230px; width:136px; height:106px; background:#719CAF;">
+      <span class="name">🇩🇪 Germany</span>
+    </div>
+    <div class="cell small" style="left:6px; top:342px; width:148px; height:128px; background:#D8AF47;">
+      <span class="name">🇮🇳 India</span>
+    </div>
+    <div class="cell small" style="left:160px; top:342px; width:146px; height:128px; background:#719CAF;">
+      <span class="name">🇬🇧 UK</span>
+    </div>
+    <div class="cell small" style="left:312px; top:342px; width:130px; height:128px; background:#719CAF;">
+      <span class="name">🇫🇷 France</span>
+    </div>
+    <div class="cell small" style="left:448px; top:342px; width:146px; height:128px; background:#719CAF;">
+      <span class="name">🇮🇹 Italy</span>
+    </div>
+    <div class="cell small" style="left:6px; top:476px; width:128px; height:148px; background:#6FAF84;">
+      <span class="name">🇧🇷 Brazil</span>
+    </div>
+    <div class="cell small" style="left:140px; top:476px; width:128px; height:148px; background:#6FAF96;">
+      <span class="name">🇨🇦 Canada</span>
+    </div>
+    <div class="cell small" style="left:274px; top:476px; width:118px; height:148px; background:#D8AF47;">
+      <span class="name">🇰🇷 Korea</span>
+    </div>
+    <div class="cell tiny" style="left:398px; top:476px; width:96px; height:70px; background:#CC5803;">
+      <span class="name">🇦🇺 Australia</span>
+    </div>
+    <div class="cell tiny" style="left:398px; top:552px; width:96px; height:72px; background:#6FAFAC;">
+      <span class="name">🇳🇬 Nigeria</span>
+    </div>
+    <div class="cell tiny" style="left:500px; top:476px; width:94px; height:70px; background:#1B4965;">
+      <span class="name" style="color:rgba(233,238,244,0.9)">🇸🇦 Saudi A.</span>
+    </div>
+    <div class="cell tiny" style="left:500px; top:552px; width:94px; height:72px; background:#70A9AF;">
+      <span class="name">🇲🇽 Mexico</span>
+    </div>
+  </div>
+</body>
+</html>
