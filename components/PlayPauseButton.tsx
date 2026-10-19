@@ -42,7 +42,7 @@ export default function PlayPauseButton({ playing, onClick, size = 48, disabled 
         {/* Triangle Play */}
         <polygon
           points="18,12 35,22 18,32"
-          fill="#4DB882"
+          fill="#9ccab8"
           opacity={playing ? 0 : 1}
           style={{ transition: "opacity 0.2s" }}
         />

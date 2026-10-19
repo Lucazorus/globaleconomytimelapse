@@ -43,7 +43,7 @@ function formatValue(v: number, isPerCapita: boolean): string {
 const margin = { top: 16, right: 130, bottom: 36, left: 80 };
 
 // Couleurs vives attribuées aux pays épinglés, dans l'ordre d'épinglage
-const FOCUS_COLORS = ["#FA003F", "#38BDF8", "#FBBF24", "#A78BFA"];
+const FOCUS_COLORS = ["#f2a516", "#38BDF8", "#9ccab8", "#A78BFA"];
 const MAX_FOCUS = 4;
 
 export default function BumpChart({
@@ -792,7 +792,7 @@ export default function BumpChart({
             pointerEvents: "none",
             top: tooltip.y - 80,
             left: tooltip.x + 12,
-            background: "rgba(15,22,30,0.97)",
+            background: "rgba(11,20,18,0.97)",
             color: "#fff",
             borderRadius: 12,
             padding: "10px 16px 10px 14px",
@@ -802,7 +802,7 @@ export default function BumpChart({
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-start",
-            fontFamily: "Inter, Arial, sans-serif",
+            fontFamily: "inherit",
             backdropFilter: "blur(8px)",
           }}
           onMouseMove={touchTooltip}
@@ -836,7 +836,7 @@ export default function BumpChart({
               fontSize: 11,
               fontWeight: 400,
               color: "rgba(255,255,255,0.45)",
-              fontFamily: "Inter, Arial, sans-serif",
+              fontFamily: "inherit",
               marginBottom: 4,
               lineHeight: 1.2,
             }}>
@@ -911,10 +911,11 @@ export default function BumpChart({
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1, minWidth: 80, flexShrink: 0 }}>
           <span style={{
             fontSize: "2rem",
-            fontWeight: 800,
-            color: "rgba(255,255,255,0.85)",
-            fontFamily: "Inter, Arial, sans-serif",
-            letterSpacing: "-0.02em",
+            fontWeight: 400,
+            color: "var(--ink)",
+            fontFamily: "var(--font-share-tech-mono), 'Share Tech Mono', Menlo, monospace",
+            letterSpacing: "0.02em",
+            fontVariantNumeric: "tabular-nums",
             lineHeight: 1,
           }}>
             {roundedYear}
@@ -924,7 +925,7 @@ export default function BumpChart({
               fontSize: "0.6rem",
               fontWeight: 600,
               color: "rgba(255,255,255,0.35)",
-              fontFamily: "Inter, Arial, sans-serif",
+              fontFamily: "inherit",
               letterSpacing: "0.07em",
               textTransform: "uppercase",
               marginTop: 2,
@@ -983,7 +984,7 @@ export default function BumpChart({
           <span style={{
             fontSize: 11,
             color: "rgba(255,255,255,0.45)",
-            fontFamily: "Inter, Arial, sans-serif",
+            fontFamily: "inherit",
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             whiteSpace: "nowrap",
@@ -1005,7 +1006,7 @@ export default function BumpChart({
             fontSize: 13,
             fontWeight: 600,
             color: "#fff",
-            fontFamily: "Inter, Arial, sans-serif",
+            fontFamily: "inherit",
             minWidth: 22,
             textAlign: "left",
             userSelect: "none",
@@ -1031,7 +1032,7 @@ export default function BumpChart({
                   fontSize: 13,
                   fontWeight: 500,
                   color: "rgba(255,255,255,0.88)",
-                  fontFamily: "Inter, Arial, sans-serif",
+                  fontFamily: "inherit",
                   lineHeight: "1.5",
                   whiteSpace: "nowrap",
                 }}

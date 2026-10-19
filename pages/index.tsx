@@ -373,8 +373,8 @@ export default function Home() {
     return (
       <>
         {seoHead}
-        <div className="flex-1 flex items-center justify-center w-full h-full bg-[#1E2D2F]">
-          <div className="text-xl text-slate-100">{t.loading}</div>
+        <div className="flex-1 flex items-center justify-center w-full h-full" style={{ background: "var(--bg)" }}>
+          <div className="text-xl" style={{ color: "var(--muted)" }}>{t.loading}</div>
         </div>
       </>
     );

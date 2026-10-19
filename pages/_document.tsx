@@ -7,7 +7,7 @@ export default function Document() {
     <Html lang="fr">
       <Head>
         <link rel="icon" type="image/png" href="/logostatic.png" />
-        <meta name="theme-color" content="#1a2327" />
+        <meta name="theme-color" content="#0b1412" />
       </Head>
       <body>
         <Main />

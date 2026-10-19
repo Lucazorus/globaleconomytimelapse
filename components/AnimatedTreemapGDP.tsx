@@ -446,7 +446,7 @@ export default function AnimatedTreemapGDP({
         const isFocused = countryFocus && d.country === countryFocus;
         const w = Math.max(0, Math.round(d.x1 - d.x0));
         const h = Math.max(0, Math.round(d.y1 - d.y0));
-        const baseColor = isFocused ? "#FA003F" : regionColors(d.region);
+        const baseColor = isFocused ? "#f2a516" : regionColors(d.region);
 
         // Rect principal
         g.append("rect")
@@ -601,7 +601,7 @@ export default function AnimatedTreemapGDP({
             pointerEvents: "none",
             top: tooltip.y - 80,
             left: tooltip.x + 12,
-            background: "rgba(15,22,30,0.97)",
+            background: "rgba(11,20,18,0.97)",
             color: "#fff",
             borderRadius: 12,
             padding: "10px 16px 10px 14px",
@@ -611,7 +611,7 @@ export default function AnimatedTreemapGDP({
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-start",
-            fontFamily: "Inter, Arial, sans-serif",
+            fontFamily: "inherit",
             backdropFilter: "blur(8px)",
           }}
           onMouseMove={touchTooltip}
@@ -722,10 +722,11 @@ export default function AnimatedTreemapGDP({
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1, minWidth: 80, flexShrink: 0 }}>
           <span style={{
             fontSize: "2rem",
-            fontWeight: 800,
-            color: "rgba(255,255,255,0.85)",
-            fontFamily: "Inter, Arial, sans-serif",
-            letterSpacing: "-0.02em",
+            fontWeight: 400,
+            color: "var(--ink)",
+            fontFamily: "var(--font-share-tech-mono), 'Share Tech Mono', Menlo, monospace",
+            letterSpacing: "0.02em",
+            fontVariantNumeric: "tabular-nums",
             lineHeight: 1,
           }}>
             {Math.round(animValue)}
@@ -735,7 +736,7 @@ export default function AnimatedTreemapGDP({
               fontSize: "0.6rem",
               fontWeight: 600,
               color: "rgba(255,255,255,0.35)",
-              fontFamily: "Inter, Arial, sans-serif",
+              fontFamily: "inherit",
               letterSpacing: "0.07em",
               textTransform: "uppercase",
               marginTop: 2,
@@ -814,7 +815,7 @@ export default function AnimatedTreemapGDP({
                 marginRight: 5,
                 fontSize: 15,
                 fontWeight: 500,
-                fontFamily: "Inter, Arial, sans-serif",
+                fontFamily: "inherit",
                 letterSpacing: "0.04em",
                 background: "rgba(255,255,255,0.09)",
                 borderRadius: 7,
@@ -832,24 +833,24 @@ export default function AnimatedTreemapGDP({
           {countryFocus && (
             <button
               onClick={() => handleCountryFocus(null)}
-              className="ml-2 text-white text-sm cursor-pointer select-none inline-flex items-center"
+              className="ml-2 text-sm cursor-pointer select-none inline-flex items-center"
               style={{
-                color: "#fff",  
+                color: "#0b1412",
                 padding: "3px 12px",
-                borderRadius: 8,
+                borderRadius: 6,
                 border: "none",
-                background: "#f9013f",
+                background: "#f2a516",
                 marginLeft: 7,
                 marginRight: 3,
-                fontWeight: 400,
-                fontFamily: "Inter, Arial, sans-serif",
+                fontWeight: 600,
+                fontFamily: "inherit",
                 fontSize: 15,
                 lineHeight: "1.25",
                 transition: "background 0.18s",
               }}
               title="Clear"
-              onMouseOver={e => (e.currentTarget.style.background = "#f9013f")}
-              onMouseOut={e => (e.currentTarget.style.background = "#f9013f")}
+              onMouseOver={e => (e.currentTarget.style.background = "#ffc14d")}
+              onMouseOut={e => (e.currentTarget.style.background = "#f2a516")}
             >
               Clear
             </button>

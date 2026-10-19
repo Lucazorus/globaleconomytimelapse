@@ -354,7 +354,7 @@ export default function BarChartRace({
             .attr("width", (d: any) => Math.max(0, x(d.gdp) - chartLeft))
             .attr("fill", (d: any) =>
               countryFocus && d.country === countryFocus
-                ? "#FA003F"
+                ? "#f2a516"
                 : regionColors(d.region)
             )
             .attr("cursor", "pointer")
@@ -377,7 +377,7 @@ export default function BarChartRace({
           update.select("rect.bar-fill")
             .attr("fill", (d: any) =>
               countryFocus && d.country === countryFocus
-                ? "#FA003F"
+                ? "#f2a516"
                 : regionColors(d.region)
             )
             .on("click", (_e: any, d: any) => setCountryFocus(d.country));
@@ -389,7 +389,7 @@ export default function BarChartRace({
       .attr("width", (d: any) => Math.max(0, x(d.gdp) - chartLeft))
       .attr("fill", (d: any) =>
         countryFocus && d.country === countryFocus
-          ? "#FA003F"
+          ? "#f2a516"
           : regionColors(d.region)
       )
       .on("click", (_e: any, d: any) => setCountryFocus(d.country));
@@ -420,7 +420,7 @@ export default function BarChartRace({
         .attr("x", margin.left + rankColWidth - 6)
         .attr("y", yMid)
         .attr("font-size", fsRank)
-        .attr("fill", isFocused ? "#FA003F" : "rgba(255,255,255,0.35)")
+        .attr("fill", isFocused ? "#f2a516" : "rgba(255,255,255,0.35)")
         .attr("font-family", "Inter, Arial, sans-serif")
         .attr("font-weight", 600)
         .attr("text-anchor", "end")
@@ -618,10 +618,11 @@ export default function BarChartRace({
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1, minWidth: 80, flexShrink: 0 }}>
           <span style={{
             fontSize: "2rem",
-            fontWeight: 800,
-            color: "rgba(255,255,255,0.85)",
-            fontFamily: "Inter, Arial, sans-serif",
-            letterSpacing: "-0.02em",
+            fontWeight: 400,
+            color: "var(--ink)",
+            fontFamily: "var(--font-share-tech-mono), 'Share Tech Mono', Menlo, monospace",
+            letterSpacing: "0.02em",
+            fontVariantNumeric: "tabular-nums",
             lineHeight: 1,
           }}>
             {Math.round(animValue)}
@@ -631,7 +632,7 @@ export default function BarChartRace({
               fontSize: "0.6rem",
               fontWeight: 600,
               color: "rgba(255,255,255,0.35)",
-              fontFamily: "Inter, Arial, sans-serif",
+              fontFamily: "inherit",
               letterSpacing: "0.07em",
               textTransform: "uppercase",
               marginTop: 2,
@@ -684,7 +685,7 @@ export default function BarChartRace({
           <span style={{
             fontSize: 11,
             color: "rgba(255,255,255,0.45)",
-            fontFamily: "Inter, Arial, sans-serif",
+            fontFamily: "inherit",
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             whiteSpace: "nowrap",
@@ -706,7 +707,7 @@ export default function BarChartRace({
             fontSize: 13,
             fontWeight: 600,
             color: "#fff",
-            fontFamily: "Inter, Arial, sans-serif",
+            fontFamily: "inherit",
             minWidth: 22,
             textAlign: "left",
             userSelect: "none",
@@ -723,7 +724,7 @@ export default function BarChartRace({
               fontSize: 13,
               fontWeight: 500,
               color: "rgba(255,255,255,0.7)",
-              fontFamily: "Inter, Arial, sans-serif",
+              fontFamily: "inherit",
               marginRight: 4,
             }}
           >
@@ -738,7 +739,7 @@ export default function BarChartRace({
                 marginRight: 5,
                 fontSize: 15,
                 fontWeight: 500,
-                fontFamily: "Inter, Arial, sans-serif",
+                fontFamily: "inherit",
                 letterSpacing: "0.04em",
                 background: "rgba(255,255,255,0.09)",
                 borderRadius: 7,
@@ -755,17 +756,17 @@ export default function BarChartRace({
           )}
           <button
             onClick={() => setCountryFocus(null)}
-            className="ml-2 text-white text-sm cursor-pointer select-none inline-flex items-center"
+            className="ml-2 text-sm cursor-pointer select-none inline-flex items-center"
             style={{
-              color: "#fff",
+              color: "#0b1412",
               padding: "2px 10px",
-              borderRadius: 8,
+              borderRadius: 6,
               border: "none",
-              background: "#f9013f",
+              background: "#f2a516",
               marginLeft: 7,
               marginRight: 3,
-              fontWeight: 400,
-              fontFamily: "Inter, Arial, sans-serif",
+              fontWeight: 600,
+              fontFamily: "inherit",
               fontSize: 13,
               lineHeight: "1.25",
             }}
